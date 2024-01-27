@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\MicroUtils\MicroUtils.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--<None Include="..\UnityFileSystem\UnityFileApi.dll" Link="UnityFileApi.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>-->
+    <None Include="..\UnityDataTools\UnityFileSystem\UnityFileSystemApi.dll" Link="UnityFileSystemApi.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="..\UnityDataTools\UnityFileSystem\UnityFileSystemApi.so" Link="UnityFileSystemApi.so">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="..\UnityDataTools\UnityFileSystem\UnityFileSystemApi.dylib" Link="UnityFileSystemApi.dylib">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

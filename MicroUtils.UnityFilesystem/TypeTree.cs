@@ -5,6 +5,7 @@ using System.Text;
 
 using MicroUtils;
 using MicroUtils.Functional;
+using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
 
@@ -136,7 +137,7 @@ public static class TypeTreeUtil
     }
 
     public static Option<ITypeTreeObject> TryIntegralValue(
-        UnityFileReader reader,
+        UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long offset,
         TypeTreeNode node)
@@ -165,7 +166,7 @@ public static class TypeTreeUtil
     }
 
     public static Option<ITypeTreeObject> TryString(
-        UnityFileReader reader,
+        UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
         TypeTreeNode node)
@@ -188,7 +189,7 @@ public static class TypeTreeUtil
     }
 
     public static Option<ITypeTreeObject> TryArray(
-        UnityFileReader reader,
+        UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
         TypeTreeNode node,
@@ -239,7 +240,7 @@ public static class TypeTreeUtil
     }
 
     public static TypeTreeValue<Dictionary<string, ITypeTreeObject>> GetObject(
-        UnityFileReader reader,
+        UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
         TypeTreeNode node,
@@ -278,7 +279,7 @@ public static class TypeTreeUtil
 public static class TypeTreeObject
 {
     internal static ITypeTreeObject Get(
-        UnityFileReader reader,
+        UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long offset,
         TypeTreeNode node,
@@ -323,7 +324,7 @@ public static class TypeTreeObject
 
     public static ITypeTreeObject Get(
         SerializedFile sf,
-        UnityFileReader reader,
+        UnityBinaryFileReader reader,
         ObjectInfo objectInfo) =>
         Get(reader, MicroStack<TypeTreeNode>.Empty, objectInfo.Offset, sf.GetTypeTreeRoot(objectInfo.Id), sf);
 

@@ -12,14 +12,16 @@ type MicroOption<'a> = MicroUtils.Functional.Option<'a>
 open UnityDataTools
 open UnityDataTools.FileSystem
 
+open MicroUtils.UnityFilesystem
+
 open UnityMicro.Parsers
 open UnityMicro.TypeTree
 
 let mountPoint = @"archive:/"
 
 let bundlePath = 
-    //@"D:\SteamLibrary\steamapps\common\Warhammer 40,000 Rogue Trader\Bundles\ui"
-    @"D:\SteamLibrary\steamapps\common\Pathfinder Second Adventure\Bundles\ui"
+    @"D:\SteamLibrary\steamapps\common\Warhammer 40,000 Rogue Trader\Bundles\ui"
+    //@"D:\SteamLibrary\steamapps\common\Pathfinder Second Adventure\Bundles\ui"
 
 let bufferSize = 256 * 1024 * 1024
 //let maxBufferSize = 256 * 1024 * 1024
@@ -122,7 +124,7 @@ let dumpStreamData dumpPath =
         printfn "%s" path
 
         use sf = UnityFileSystem.OpenSerializedFile(path)
-        use sfReader = new UnityFileReader(path, bufferSize)
+        use sfReader = new UnityBinaryFileReader(path)
 
         let sw = Stopwatch.StartNew()
         let mutable i = 0
@@ -158,7 +160,7 @@ let dumpStreamData dumpPath =
             for (filePath, si) in sis do
                 let data =
                     si.TryGetData(fun path size ->
-                        new UnityFileReader(path, size) |> ValueSome |> toMicroOption)
+                        new UnityBinaryFileReader(path) |> ValueSome |> toMicroOption)
                     |> toValueOption
 
                 match data with
@@ -182,7 +184,7 @@ let dumpStreamData dumpPath =
         //        fileReader <- ValueNone
         //    | _ -> ()
 
-            sw.Stop()
+        sw.Stop()
 
         printfn "Dumped stream data x %i in %ims" i sw.ElapsedMilliseconds
 
@@ -234,7 +236,7 @@ let dump outputDir =
 
         use sf = UnityFileSystem.OpenSerializedFile(path)
 
-        let newReader() = new UnityFileReader(path, bufferSize)
+        let newReader() = new UnityBinaryFileReader(path)
 
         let reader = newReader()
         
@@ -334,7 +336,7 @@ let dump outputDir =
                 let tto =
                     pptr.TryDereference(
                         (fun sfp -> (if sfp = path then ValueSome sf else ValueNone) |> toMicroOption),
-                        (fun readerPath -> (if readerPath = path then MicroOption.Some(reader) else MicroOption<UnityFileReader>.None)))
+                        (fun readerPath -> (if readerPath = path then MicroOption.Some(reader) else MicroOption<UnityBinaryFileReader>.None)))
                     |> toValueOption
                     |> ValueOption.bind (fun tto -> tto.TryGetObject() |> toValueOption)
 

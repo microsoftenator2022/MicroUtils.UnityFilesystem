@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 using MicroUtils;
 using MicroUtils.Functional;
+using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
 
@@ -14,7 +15,7 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 {
     public static readonly PPtr NullPtr = new();
 
-    public Option<ITypeTreeObject> TryDereference(Func<string, Option<SerializedFile>> getSerializedFile, Func<string, Option<UnityFileReader>> getReader)
+    public Option<ITypeTreeObject> TryDereference(Func<string, Option<SerializedFile>> getSerializedFile, Func<string, Option<UnityBinaryFileReader>> getReader)
     {
         if (this == NullPtr)
         {

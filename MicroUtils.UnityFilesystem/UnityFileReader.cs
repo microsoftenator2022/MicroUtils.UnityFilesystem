@@ -9,6 +9,7 @@ using System.Text;
 //using Force.Crc32;
 
 // This class can be used to read typed data from a UnityFile. Is uses a buffer for better performance.
+[Obsolete]
 public class UnityFileReader : IDisposable
 {
     //readonly bool debug;
@@ -22,7 +23,7 @@ public class UnityFileReader : IDisposable
     //readonly int bufferStartSize;
     //readonly int maxBufferSize;
 
-    readonly bool constantBufferSize;
+    //readonly bool constantBufferSize;
 
     public long Length { get; }
 
@@ -45,11 +46,11 @@ public class UnityFileReader : IDisposable
         m_BufferEndInFile = -1;
     }
 
-    static bool IsSubRangeOf(long rangeStart, long rangeLength, long subRangeStart, long subRangeLength) =>
-        subRangeStart >= rangeStart && (subRangeStart + subRangeLength) <= (rangeStart + rangeLength);
+    //static bool IsSubRangeOf(long rangeStart, long rangeLength, long subRangeStart, long subRangeLength) =>
+    //    subRangeStart >= rangeStart && (subRangeStart + subRangeLength) <= (rangeStart + rangeLength);
 
-    static bool IsSubRangeOf((long start, long length) range, (long start, long length) subRange) =>
-        IsSubRangeOf(range.start, range.length, subRange.start, subRange.length);
+    //static bool IsSubRangeOf((long start, long length) range, (long start, long length) subRange) =>
+    //    IsSubRangeOf(range.start, range.length, subRange.start, subRange.length);
 
     int GetBufferOffset(long fileOffset, int count)
     {

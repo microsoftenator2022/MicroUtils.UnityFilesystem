@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using MicroUtils.Functional;
+using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
 
@@ -15,7 +16,7 @@ using UnityMicro.TypeTree;
 
 public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawPath)
 {
-    public Option<byte[]> TryGetData(Func<string, int, Option<UnityFileReader>> getReader)
+    public Option<byte[]> TryGetData(Func<string, int, Option<UnityBinaryFileReader>> getReader)
     {
             var match = StreamingInfoParser.PathRegex().Match(RawPath);
             var mountPoint = match.Groups["MountPoint"].Value;

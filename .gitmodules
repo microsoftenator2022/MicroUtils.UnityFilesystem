@@ -1,0 +1,3 @@
+[submodule "UnityDataTools"]
+	path = UnityDataTools
+	url = https://github.com/Unity-Technologies/UnityDataTools

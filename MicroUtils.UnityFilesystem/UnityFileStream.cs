@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -362,15 +363,12 @@ internal class UnityFileStream : Stream
         return bytesRead;
     }
 
-    public override int Read(byte[] buffer, int offset, int count)
+    public override int Read(byte[] buffer, int offset, int count) => this.Read(buffer.AsSpan(offset, count));
+
+    public override int Read(Span<byte> buffer)
     {
-        CheckState();
-
-        if (count < 0)
-        {
-            throw new ArgumentException(null, nameof(count));
-        }
-
+        var offset = 0;
+        var count = buffer.Length;
         var bytesRead = 0;
 
         while (count > 0)
@@ -402,8 +400,8 @@ internal class UnityFileStream : Stream
             if (count + offsetInBuffer > bytesInBuffer)
                 copyCount = bytesInBuffer - offsetInBuffer;
 
-            bufferInternal.AsSpan(offsetInBuffer, copyCount).CopyTo(buffer.AsSpan(offset));
-            
+            bufferInternal.AsSpan(offsetInBuffer, copyCount).CopyTo(buffer[offset..]);
+
             offsetInBuffer += copyCount;
 
             offset += copyCount;
@@ -417,17 +415,6 @@ internal class UnityFileStream : Stream
             }
 #endif
         }
-
-        return bytesRead;
-    }
-
-    public override int Read(Span<byte> buffer)
-    {
-        var bytes = new byte[buffer.Length];
-
-        var bytesRead = this.Read(bytes, 0, buffer.Length);
-
-        bytes.AsSpan(0, bytesRead).CopyTo(buffer);
 
         return bytesRead;
     }

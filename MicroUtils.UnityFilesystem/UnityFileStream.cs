@@ -17,20 +17,26 @@ public class UnityBinaryFileReader : IDisposable
 
 #if DEBUG
     readonly bool DebugData = false;
+
+#pragma warning disable CS0612 // Type or member is obsolete
     UnityFileReader oldReader;
+#pragma warning restore CS0612 // Type or member is obsolete
 #endif
 
-    public UnityBinaryFileReader(string path
+    public UnityBinaryFileReader(string path, int bufferSize = 4096
 #if DEBUG
         , bool debugData = false
 #endif
         )
     {
-        this.stream = new(path);
+        this.stream = new(path, bufferSize);
         this.reader = new(this.stream);
-        this.oldReader = new(path, 256 * 1024 * 1024);
-
 #if DEBUG
+        if (debugData)
+            this.oldReader = new(path, 256 * 1024 * 1024);
+        else
+            this.oldReader = null!;
+
         this.DebugData = debugData;
 #endif
 
@@ -353,8 +359,6 @@ internal class UnityFileStream : Stream
 
         positionInternal += bytesRead;
 
-        //Console.WriteLine($"New position = {positionInternal}");
-
         return bytesRead;
     }
 
@@ -373,13 +377,14 @@ internal class UnityFileStream : Stream
         {
             if (offsetInBuffer >= bytesInBuffer)
             {
+#if DEBUG
                 if (positionInternal != bufferStartOffset + bytesInBuffer)
                 {
                     throw new Exception($"positionInternal != bufferStartOffset + bytesInBuffer : {positionInternal} != {bufferStartOffset + bytesInBuffer}");
                 }
-
+#endif
                 ReadFromFile();
-
+#if DEBUG
                 if (positionInternal != bufferStartOffset + bytesInBuffer)
                 {
                     throw new Exception($"positionInternal != bufferStartOffset + bytesInBuffer : {positionInternal} != {bufferStartOffset + bytesInBuffer}");
@@ -389,6 +394,7 @@ internal class UnityFileStream : Stream
                 {
                     throw new Exception($"bytesInBuffer <= 0 : {bytesInBuffer}");
                 }
+#endif
             }
 
             int copyCount = count;
@@ -404,11 +410,12 @@ internal class UnityFileStream : Stream
             count -= copyCount;
 
             bytesRead += copyCount;
-
+#if DEBUG
             if (count < 0)
             {
                 throw new Exception($"count < 0 : {count}");
             }
+#endif
         }
 
         return bytesRead;
@@ -447,8 +454,6 @@ internal class UnityFileStream : Stream
     {
         CheckState();
 
-        //Console.WriteLine($"Seek to {offset} from {origin}");
-
         var (fileOffset, seekOrigin) = origin switch
         {
             System.IO.SeekOrigin.Begin => (offset, UnityDataTools.FileSystem.SeekOrigin.Begin),
@@ -471,6 +476,7 @@ internal class UnityFileStream : Stream
             offsetInBuffer = bytesInBuffer = 0;
         }
 
+#if DEBUG
         if (newOffset < 0)
         {
             throw new Exception($"newOffset < 0 {newOffset}");
@@ -480,6 +486,7 @@ internal class UnityFileStream : Stream
         {
             throw new Exception($"newOffset != fileOffset : {newOffset} != {fileOffset}");
         }
+#endif
 
         return newOffset;
     }

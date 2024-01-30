@@ -320,7 +320,6 @@ let dump outputDir =
             |> Seq.collect getPPtrs
             |> Seq.cache
             |> Seq.distinct
-            |> Seq.cache
 
         pptrs
         |> Seq.length

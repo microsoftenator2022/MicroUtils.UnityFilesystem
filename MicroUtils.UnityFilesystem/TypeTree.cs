@@ -1,15 +1,13 @@
-﻿namespace UnityMicro.TypeTree;
+﻿namespace MicroUtils.UnityFilesystem;
 
 using System.Diagnostics;
 using System.Text;
 
 using MicroUtils;
 using MicroUtils.Functional;
-using MicroUtils.UnityFilesystem;
+using MicroUtils.UnityFilesystem.Parsers;
 
 using UnityDataTools.FileSystem;
-
-using UnityMicro.Parsers;
 
 public interface ITypeTreeObject
 {
@@ -17,6 +15,8 @@ public interface ITypeTreeObject
     MicroStack<TypeTreeNode> Ancestors { get; }
     long StartOffset { get; }
     long EndOffset { get; }
+    ITypeTreeObject? this[string key] { get; }
+    ITypeTreeObject? this[int key] { get; }
 }
 
 public readonly record struct TypeTreeValue<T>(
@@ -26,6 +26,9 @@ public readonly record struct TypeTreeValue<T>(
     long EndOffset,
     T Value) : ITypeTreeObject
 {
+    public ITypeTreeObject? this[string key] => this.TryGetObject().Map(o => o.Value[key]).MaybeValue;
+    public ITypeTreeObject? this[int key] => this.TryGetArray().Map(o => o[key]).MaybeValue;
+
     static IEnumerable<(int, string)> GetToStringLines(ITypeTreeObject obj, int indentLevel = 0)
     {
         yield return (indentLevel, $"{obj.Node.Name} : {obj.Node.Type} ({obj.Node.CSharpType})");
@@ -109,7 +112,10 @@ public readonly record struct TypeTreeIgnored(
     MicroStack<TypeTreeNode> Ancestors,
     long StartOffset,
     long EndOffset) : ITypeTreeObject
-{ }
+{
+    public ITypeTreeObject? this[string key] => null;
+    public ITypeTreeObject? this[int key] => null;
+}
 
 public static class TypeTreeExtensions
 {
@@ -353,9 +359,9 @@ public static class TypeTreeObject
         return Option<Func<T?>>.None;
     }
 
-    //public static Option<T[]> TryGetArray<T>(this ITypeTreeObject tto) => TryGetValue<T[]>(tto).Map(get => get());
+    public static Option<T[]> TryGetArray<T>(this ITypeTreeObject tto) => TryGetValue<T[]?>(tto).Bind(get => get().ToOption());
 
-    //public static Option<ITypeTreeObject[]> TryGetArray(this ITypeTreeObject tto) => TryGetArray<ITypeTreeObject>(tto);
+    public static Option<ITypeTreeObject[]> TryGetArray(this ITypeTreeObject tto) => TryGetArray<ITypeTreeObject>(tto);
 
     public static Option<TypeTreeValue<Dictionary<string, ITypeTreeObject>>> TryGetObject(this ITypeTreeObject tto)
     {

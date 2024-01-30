@@ -1,4 +1,4 @@
-﻿namespace UnityMicro.Parsers;
+﻿namespace MicroUtils.UnityFilesystem.Parsers;
 
 using System.IO;
 using System.Text.RegularExpressions;
@@ -8,8 +8,6 @@ using MicroUtils.Functional;
 using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
-
-using UnityMicro.TypeTree;
 
 public readonly record struct PPtr(string TypeName, int FileID, long PathID, string SerializedFilePath)
 {

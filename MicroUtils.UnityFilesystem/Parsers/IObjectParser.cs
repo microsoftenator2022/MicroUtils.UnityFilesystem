@@ -1,4 +1,4 @@
-﻿namespace UnityMicro.Parsers;
+﻿namespace MicroUtils.UnityFilesystem.Parsers;
 
 using System;
 using System.Collections.Generic;
@@ -9,10 +9,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 using MicroUtils.Functional;
+using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
-
-using UnityMicro.TypeTree;
 
 public interface IObjectParser
 {

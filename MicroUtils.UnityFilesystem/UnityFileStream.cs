@@ -254,6 +254,11 @@ public class UnityBinaryFileReader : IDisposable
     public void Dispose() => stream.Dispose();
 }
 
+
+/// <summary>
+/// Stream reader for UnityFile. Unity Filesystem API seems to expect a fixed buffer for readers(?).
+/// Unlike example code in UnityDataTools, this handles request length > buffer size.
+/// </summary>
 internal class UnityFileStream : Stream
 {
     private readonly UnityFile file;
@@ -265,25 +270,6 @@ internal class UnityFileStream : Stream
     int bytesInBuffer = 0;
 
     private readonly Lazy<long> length;
-
-    //private int ReadIntoBuffer(long offset, int length)
-    //{
-    //    if (positionInternal != offset)
-    //        positionInternal = file.Seek(offset, SeekOrigin.Begin);
-
-    //    if (positionInternal != offset)
-    //        throw new IndexOutOfRangeException();
-
-    //    bufferStartOffset = positionInternal;
-    //    offsetInBuffer = 0;
-
-    //    bytesInBuffer = (int)file.Read(length, bufferInternal);
-
-    //    if (bytesInBuffer <= 0)
-    //        throw new IndexOutOfRangeException();
-
-    //    return bytesInBuffer;
-    //}
 
     private UnityFileStream(UnityFile file, byte[] bufferInternal)
     {
@@ -367,6 +353,8 @@ internal class UnityFileStream : Stream
 
     public override int Read(Span<byte> buffer)
     {
+        CheckState();
+
         var offset = 0;
         var count = buffer.Length;
         var bytesRead = 0;
@@ -429,7 +417,7 @@ internal class UnityFileStream : Stream
 
         var buffer = new byte[1];
 
-        var bytesRead = this.Read(buffer, 0, 1);
+        var bytesRead = this.Read(buffer);
 
         if (bytesRead <= 0)
             return -1;
@@ -441,6 +429,7 @@ internal class UnityFileStream : Stream
     {
         CheckState();
 
+        // Why does UnityFileSystem have its own SeekOrigin enum? I don't care enough to find out, but it is annoying
         var (fileOffset, seekOrigin) = origin switch
         {
             System.IO.SeekOrigin.Begin => (offset, UnityDataTools.FileSystem.SeekOrigin.Begin),
@@ -451,6 +440,7 @@ internal class UnityFileStream : Stream
 
         var newOffset = fileOffset;
 
+        // Is target inside the current buffer?
         if (fileOffset >= bufferStartOffset && fileOffset < (bufferStartOffset + bytesInBuffer))
         {
             offsetInBuffer = (int)(fileOffset - bufferStartOffset);

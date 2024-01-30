@@ -1,4 +1,4 @@
-﻿namespace UnityMicro.Parsers;
+﻿namespace MicroUtils.UnityFilesystem.Parsers;
 
 using System;
 using System.Collections.Generic;
@@ -11,8 +11,6 @@ using MicroUtils.Functional;
 using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
-
-using UnityMicro.TypeTree;
 
 public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawPath)
 {

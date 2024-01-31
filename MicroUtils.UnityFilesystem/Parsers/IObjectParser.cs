@@ -17,7 +17,7 @@ public interface IObjectParser
 {
     bool CanParse(TypeTreeNode node);
     Type ObjectType(TypeTreeNode node);
-    Option<ITypeTreeObject> TryParse(ITypeTreeObject obj, SerializedFile sf);
+    Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf);
 }
 
 public static class ObjectParsers

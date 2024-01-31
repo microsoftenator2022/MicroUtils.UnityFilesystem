@@ -4,38 +4,44 @@ using System.Diagnostics;
 using System.Text;
 
 using MicroUtils;
+using MicroUtils.Linq;
 using MicroUtils.Functional;
 using MicroUtils.UnityFilesystem.Parsers;
 
 using UnityDataTools.FileSystem;
 
-public interface ITypeTreeObject
+public interface ITypeTreeValue
 {
     TypeTreeNode Node { get; }
     MicroStack<TypeTreeNode> Ancestors { get; }
     long StartOffset { get; }
     long EndOffset { get; }
-    ITypeTreeObject? this[string key] { get; }
-    ITypeTreeObject? this[int key] { get; }
+    ITypeTreeValue? this[string key] { get; }
 }
 
-public readonly record struct TypeTreeValue<T>(
+public interface ITypeTreeObject : ITypeTreeValue
+{
+    new ITypeTreeValue this[string key] { get; }
+    IDictionary<string, ITypeTreeValue> ToDictionary();
+}
+
+public record class TypeTreeValue<T>(
     TypeTreeNode Node,
     MicroStack<TypeTreeNode> Ancestors,
     long StartOffset,
     long EndOffset,
-    T Value) : ITypeTreeObject
+    T Value) : ITypeTreeValue
 {
-    public ITypeTreeObject? this[string key] => this.TryGetObject().Map(o => o.Value[key]).MaybeValue;
-    public ITypeTreeObject? this[int key] => this.TryGetArray().Map(o => o[key]).MaybeValue;
-
-    static IEnumerable<(int, string)> GetToStringLines(ITypeTreeObject obj, int indentLevel = 0)
+    public ITypeTreeValue? this[string key] => this.TryGetObject().Map(o => o[key]).MaybeValue;
+    
+    static IEnumerable<(int, string)> GetToStringLines(ITypeTreeValue obj, int indentLevel = 0)
     {
         yield return (indentLevel, $"{obj.Node.Name} : {obj.Node.Type} ({obj.Node.CSharpType})");
-        if (obj is TypeTreeValue<Dictionary<string, ITypeTreeObject>> tto)
+
+        if (obj is ITypeTreeObject tto)
         {
             yield return (indentLevel, "{");
-            foreach (var n in tto.Value.Values)
+            foreach (var n in tto.ToDictionary().Values)
                 foreach (var (il, line) in GetToStringLines(n, indentLevel + 1))
                     yield return (il, $"{line}");
             yield return (indentLevel, "}");
@@ -44,9 +50,9 @@ public readonly record struct TypeTreeValue<T>(
 
         var type = obj.GetType();
 
-        if (type.IsConstructedGenericType && type.GenericTypeArguments.Any(at => typeof(System.Array).IsAssignableFrom(at)))
+        if (obj.IsArray())
         {
-            var arr = type.GetProperty(nameof(Value))?.GetValue(obj) as System.Array;
+            var arr = (obj as TypeTreeValue<System.Array>)?.Value;
             //yield return $"{arr?.Length ?? 0} items";
 
             if (arr?.Length is 0)
@@ -57,7 +63,7 @@ public readonly record struct TypeTreeValue<T>(
 
             yield return (indentLevel, "[");
          
-            if (obj is TypeTreeValue<ITypeTreeObject[]> objArr)
+            if (obj is TypeTreeValue<ITypeTreeValue[]> objArr)
             {
                 foreach (var n in objArr.Value)
                     foreach (var (il, line) in GetToStringLines(n, indentLevel + 1))
@@ -76,7 +82,7 @@ public readonly record struct TypeTreeValue<T>(
         {
             var v = type.GetProperty(nameof(Value))?.GetValue(obj);
 
-            if (v is ITypeTreeObject o)
+            if (v is ITypeTreeValue o)
             {
                 foreach (var line in GetToStringLines(o, indentLevel + 1))
                     yield return (indentLevel, $"{line}");
@@ -107,24 +113,46 @@ public readonly record struct TypeTreeValue<T>(
     }
 }
 
+public record class TypeTreeObject : TypeTreeValue<Dictionary<string, ITypeTreeValue>>, ITypeTreeObject
+{
+    readonly TypeTreeValue<Dictionary<string, ITypeTreeValue>> TypeTreeValue;
+
+    ITypeTreeValue ITypeTreeObject.this[string key] => TypeTreeValue.Value[key];
+
+    public TypeTreeObject(TypeTreeValue<Dictionary<string, ITypeTreeValue>> typeTreeValue) : base(
+        Node: typeTreeValue.Node,
+        Ancestors: typeTreeValue.Ancestors,
+        StartOffset: typeTreeValue.StartOffset,
+        EndOffset: typeTreeValue.EndOffset,
+        Value: typeTreeValue.Value)
+    {
+        this.TypeTreeValue = typeTreeValue;
+    }
+
+    public IDictionary<string, ITypeTreeValue> ToDictionary() => TypeTreeValue.Value;
+
+    public override string ToString() => base.ToString();
+
+    public static TypeTreeObject FromValue(TypeTreeValue<Dictionary<string, ITypeTreeValue>> value) => value as TypeTreeObject ?? new(value);
+}
+
 public readonly record struct TypeTreeIgnored(
     TypeTreeNode Node,
     MicroStack<TypeTreeNode> Ancestors,
     long StartOffset,
-    long EndOffset) : ITypeTreeObject
+    long EndOffset) : ITypeTreeValue
 {
-    public ITypeTreeObject? this[string key] => null;
-    public ITypeTreeObject? this[int key] => null;
+    public ITypeTreeValue? this[string key] => null;
 }
 
 public static class TypeTreeExtensions
 {
     public static long SizeSafe(this TypeTreeNode node) => node.Size < 0 ? 0 : node.Size;
 
-    public static string Name(this ITypeTreeObject obj) => obj.Node.Name;
-    public static string NodeType(this ITypeTreeObject obj) => obj.Node.Type;
-    public static long NodeSize(this ITypeTreeObject obj) => obj.Node.SizeSafe();
-    public static long NextNodeOffset(this ITypeTreeObject obj) => TypeTreeUtil.AlignOffset(obj.EndOffset, obj.Node);
+    public static string Name(this ITypeTreeValue obj) => obj.Node.Name;
+    public static string NodeType(this ITypeTreeValue obj) => obj.Node.Type;
+    public static long NodeSize(this ITypeTreeValue obj) => obj.Node.SizeSafe();
+    public static long NextNodeOffset(this ITypeTreeValue obj) => TypeTreeUtil.AlignOffset(obj.EndOffset, obj.Node);
 }
 
 public static class TypeTreeUtil
@@ -142,17 +170,17 @@ public static class TypeTreeUtil
         return offset;
     }
 
-    public static Option<ITypeTreeObject> TryIntegralValue(
+    public static Option<ITypeTreeValue> TryIntegralValue(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long offset,
         TypeTreeNode node)
     {
-        ITypeTreeObject value<T>(T value) =>
+        ITypeTreeValue value<T>(T value) =>
             new TypeTreeValue<T>(node, ancestors, offset, offset + node.SizeSafe(), value);
 
         if (!node.IsBasicType)
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
 
         return node.CSharpType switch
         {
@@ -167,21 +195,21 @@ public static class TypeTreeUtil
             var t when t == typeof(sbyte) => Option.Some(value(reader.ReadInt8(offset))),
             var t when t == typeof(byte) => Option.Some(value(reader.ReadUInt8(offset))),
             var t when t == typeof(bool) => Option.Some(value(reader.ReadUInt8(offset) != 0)),
-            _ => Option<ITypeTreeObject>.None
+            _ => Option<ITypeTreeValue>.None
         };
     }
 
-    public static Option<ITypeTreeObject> TryString(
+    public static Option<ITypeTreeValue> TryString(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
         TypeTreeNode node)
     {
-        ITypeTreeObject value(long endOffset, string value) =>
+        ITypeTreeValue value(long endOffset, string value) =>
             new TypeTreeValue<string>(node, ancestors, startOffset, endOffset, value);
 
         if (node.Type != "string")
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
 
         var length = reader.ReadInt32(startOffset);
         var offset = startOffset + 4L;
@@ -194,18 +222,18 @@ public static class TypeTreeUtil
         return Option.Some(value(offset + length, s));
     }
 
-    public static Option<ITypeTreeObject> TryArray(
+    public static Option<ITypeTreeValue> TryArray(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
         TypeTreeNode node,
         SerializedFile sf)
     {
-        ITypeTreeObject value(long endOffset, System.Array value) =>
+        ITypeTreeValue value(long endOffset, System.Array value) =>
             new TypeTreeValue<System.Array>(node, ancestors, startOffset, endOffset, value);
 
         if (!node.IsArray)
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
 
         var sizeNode = node.Children[0];
         if (!sizeNode.IsLeaf || sizeNode.Size != 4)
@@ -230,13 +258,13 @@ public static class TypeTreeUtil
             return Option.Some(value(offset, array));
         }
 
-        var elements = new ITypeTreeObject[length];
+        var elements = new ITypeTreeValue[length];
 
         if (length > 0)
         {
             for (var i = 0; i < length; i++)
             {
-                elements[i] = TypeTreeObject.Get(reader, (node, ancestors), offset, dataNode, sf);
+                elements[i] = TypeTreeValue.Get(reader, (node, ancestors), offset, dataNode, sf);
 
                 offset = elements[i].NextNodeOffset();
             }
@@ -245,46 +273,46 @@ public static class TypeTreeUtil
         return Option.Some(value(offset, elements));
     }
 
-    public static TypeTreeValue<Dictionary<string, ITypeTreeObject>> GetObject(
+    public static ITypeTreeObject GetObject(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
         TypeTreeNode node,
         SerializedFile sf)
     {
-        TypeTreeValue<Dictionary<string, ITypeTreeObject>> value(
+        TypeTreeValue<Dictionary<string, ITypeTreeValue>> value(
             long endOffset,
-            Dictionary<string, ITypeTreeObject> value) =>
+            Dictionary<string, ITypeTreeValue> value) =>
             new(node, ancestors, startOffset, endOffset, value);
 
         var offset = startOffset;
 
-        var children = new ITypeTreeObject[node.Children.Count];
+        var children = new ITypeTreeValue[node.Children.Count];
 
         for (var i = 0; i < children.Length; i++)
         {
             var childNode = node.Children[i];
             var childOffset = offset;
 
-            var child = TypeTreeObject.Get(reader, (node, ancestors), childOffset, childNode, sf);
+            var child = TypeTreeValue.Get(reader, (node, ancestors), childOffset, childNode, sf);
             children[i] = child;
             offset = child.NextNodeOffset();
         }
 
-        var properties = new Dictionary<string, ITypeTreeObject>();
+        var properties = new Dictionary<string, ITypeTreeValue>();
 
         foreach (var c in children)
         {
             properties.Add(c.Name(), c);
         }
 
-        return value(offset, properties);
+        return new TypeTreeObject(value(offset, properties));
     }
 }
 
-public static class TypeTreeObject
+public static class TypeTreeValue
 {
-    internal static ITypeTreeObject Get(
+    internal static ITypeTreeValue Get(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long offset,
@@ -302,13 +330,13 @@ public static class TypeTreeObject
                     {
                         if (!node.IsLeaf && !ancestors.IsEmpty)
                         {
-                            return Option.Some(new TypeTreeIgnored(node, ancestors, offset, node.SizeSafe()) as ITypeTreeObject);
+                            return Option.Some(new TypeTreeIgnored(node, ancestors, offset, node.SizeSafe()) as ITypeTreeValue);
                         }
 
                         throw new Exception($"{node.Type} not implemented");
                     }
 
-                    return Option<ITypeTreeObject>.None;
+                    return Option<ITypeTreeValue>.None;
                 })
                 .DefaultWith(() => TypeTreeUtil.GetObject(reader, ancestors, offset, node, sf));
 
@@ -328,30 +356,30 @@ public static class TypeTreeObject
         }
     }
 
-    public static ITypeTreeObject Get(
+    public static ITypeTreeValue Get(
         SerializedFile sf,
         UnityBinaryFileReader reader,
         ObjectInfo objectInfo) =>
         Get(reader, MicroStack<TypeTreeNode>.Empty, objectInfo.Offset, sf.GetTypeTreeRoot(objectInfo.Id), sf);
 
-    public static IEnumerable<ITypeTreeObject> Find(this ITypeTreeObject obj, Func<ITypeTreeObject, bool> predicate)
+    public static IEnumerable<ITypeTreeValue> Find(this ITypeTreeValue obj, Func<ITypeTreeValue, bool> predicate)
     {
         if (predicate(obj))
             yield return obj;
 
-        if (obj is TypeTreeValue<Dictionary<string, ITypeTreeObject>> tto)
+        if (obj is ITypeTreeObject tto)
         {
-            foreach (var c in tto.Value.Values.SelectMany(c => c.Find(predicate)))
+            foreach (var c in tto.ToDictionary().Values.SelectMany(c => c.Find(predicate)))
                 yield return c;
         }
-        else if (obj is TypeTreeValue<ITypeTreeObject[]> arr)
+        else if (obj is TypeTreeValue<ITypeTreeValue[]> arr)
         {
             foreach (var c in arr.Value.SelectMany(c => c.Find(predicate)))
                 yield return c;
         }
     }
 
-    public static Option<Func<T?>> TryGetValue<T>(this ITypeTreeObject tto)
+    public static Option<Func<T?>> TryGetValue<T>(this ITypeTreeValue tto)
     {
         if (tto is TypeTreeValue<T?> obj)
             return Option.Some(() => obj.Value);
@@ -359,25 +387,33 @@ public static class TypeTreeObject
         return Option<Func<T?>>.None;
     }
 
-    public static Option<T[]> TryGetArray<T>(this ITypeTreeObject tto) => TryGetValue<T[]?>(tto).Bind(get => get().ToOption());
+    public static Option<T[]> TryGetArray<T>(this ITypeTreeValue tto) => TryGetValue<T[]?>(tto).Bind(get => get().ToOption());
 
-    public static Option<ITypeTreeObject[]> TryGetArray(this ITypeTreeObject tto) => TryGetArray<ITypeTreeObject>(tto);
+    public static Option<ITypeTreeValue[]> TryGetArray(this ITypeTreeValue tto) => TryGetArray<ITypeTreeValue>(tto);
 
-    public static Option<TypeTreeValue<Dictionary<string, ITypeTreeObject>>> TryGetObject(this ITypeTreeObject tto)
+    public static Option<ITypeTreeObject> TryGetObject(this ITypeTreeValue tto)
     {
-        if (tto is TypeTreeValue<Dictionary<string, ITypeTreeObject>> obj)
+        if (tto is ITypeTreeObject obj)
             return Option.Some(obj);
         
-        return Option<TypeTreeValue<Dictionary<string, ITypeTreeObject>>>.None;
+        if (tto is TypeTreeValue<Dictionary<string, ITypeTreeValue>> objectValue)
+            return Option<ITypeTreeObject>.Some(TypeTreeObject.FromValue(objectValue));
+        
+        return Option<ITypeTreeObject>.None;
     }
 
-    public static Option<Func<T?>> TryGetField<T>(this TypeTreeValue<Dictionary<string, ITypeTreeObject>> tto, string fieldName)
+    public static Option<Func<T?>> TryGetField<T>(this ITypeTreeObject tto, string fieldName)
     {
-        if (tto.Value.TryGetValue(fieldName, out var value))
+        if (tto.ToDictionary().TryGetValue(fieldName, out var value))
             return value.TryGetValue<T?>();
 
         return Option<Func<T?>>.None;
     }
+
+    public static T? GetValue<T>(this ITypeTreeValue tto) => tto.TryGetValue<T>().MaybeValue is Func<T?> f ? f() : default;
+
+    public static bool IsObject(this ITypeTreeValue tto) => tto is ITypeTreeObject;
+    public static bool IsArray(this ITypeTreeValue tto) => tto is TypeTreeValue<System.Array>;
 
     //public static T? TryGetFieldValue<T>(this TypeTreeValue<Dictionary<string, ITypeTreeObject>> tto, string fieldName) =>
     //    tto.TryGetField<T>(fieldName).DefaultValue(() => default!)();

@@ -13,12 +13,12 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 {
     public static readonly PPtr NullPtr = new();
 
-    public Option<ITypeTreeObject> TryDereference(Func<string, Option<SerializedFile>> getSerializedFile, Func<string, Option<UnityBinaryFileReader>> getReader)
+    public Option<ITypeTreeValue> TryDereference(Func<string, Option<SerializedFile>> getSerializedFile, Func<string, Option<UnityBinaryFileReader>> getReader)
     {
         if (this == NullPtr)
         {
             Console.WriteLine("Tried to dereference nullptr");
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
         }
 
         string path = "Unknown";
@@ -45,12 +45,12 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 
             var pathID = this.PathID;
 
-            return reader.Map(reader => TypeTreeObject.Get(referenceFile, reader, referenceFile.GetObjectByID(pathID)));
+            return reader.Map(reader => TypeTreeValue.Get(referenceFile, reader, referenceFile.GetObjectByID(pathID)));
         }
         catch (Exception e) when (e is KeyNotFoundException or IndexOutOfRangeException)
         {
             Console.WriteLine($"Could not get reader for FileID {FileID} = {path}");
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
         }
     }
 
@@ -65,12 +65,12 @@ partial class PPtrParser : IObjectParser
 
     public bool CanParse(TypeTreeNode node) => PPtrPattern().IsMatch(node.Type);
     public Type ObjectType(TypeTreeNode _) => typeof(PPtr);
-    public Option<ITypeTreeObject> TryParse(ITypeTreeObject obj, SerializedFile sf)
+    public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         var match = PPtrPattern().Match(obj.NodeType());
 
         if (!match.Success)
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
 
         var typeName = match.Groups[1].Value;
 
@@ -79,14 +79,14 @@ partial class PPtrParser : IObjectParser
         var pid = p.Bind(p => p.TryGetField<long>("m_PathID")).Map(f => f());
 
         if (!fid.IsSome || !pid.IsSome)
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
 
         var ptr = PPtr.NullPtr;
 
         if (pid.Value != 0)
             ptr = new PPtr(typeName, fid.Value, pid.Value, sf.Path);
 
-        return Option.Some<ITypeTreeObject>(new TypeTreeValue<PPtr>(
+        return Option.Some<ITypeTreeValue>(new TypeTreeValue<PPtr>(
             obj.Node,
             obj.Ancestors,
             obj.StartOffset,

@@ -13,9 +13,7 @@ open UnityDataTools
 open UnityDataTools.FileSystem
 
 open MicroUtils.UnityFilesystem
-
-open UnityMicro.Parsers
-open UnityMicro.TypeTree
+open MicroUtils.UnityFilesystem.Parsers
 
 let mountPoint = @"archive:/"
 
@@ -23,10 +21,10 @@ let bundlePath =
     @"D:\SteamLibrary\steamapps\common\Warhammer 40,000 Rogue Trader\Bundles\ui"
     //@"D:\SteamLibrary\steamapps\common\Pathfinder Second Adventure\Bundles\ui"
 
-let bufferSize = 256 * 1024 * 1024
+//let bufferSize = 256 * 1024 * 1024
 //let maxBufferSize = 256 * 1024 * 1024
 
-type TypeTreeObject = TypeTreeValue<System.Collections.Generic.Dictionary<string, ITypeTreeObject>>
+//type TypeTreeObject = TypeTreeValue<System.Collections.Generic.Dictionary<string, ITypeTreeValue>>
 
 let toValueOption<'a> (microOption : MicroOption<'a>) : 'a voption =
     if microOption.IsSome then
@@ -38,7 +36,7 @@ let toMicroOption<'a> (valueOption : ValueOption<'a>) : MicroOption<'a> =
     | ValueSome some -> MicroOption.Some(some)
     | ValueNone -> MicroOption<'a>.None
 
-let tryGetObject (tto : ITypeTreeObject) : TypeTreeObject voption =
+let tryGetObject (tto : ITypeTreeValue) : ITypeTreeObject voption =
     tto.TryGetObject()
     |> toValueOption
 
@@ -56,25 +54,25 @@ let rec dumpTypeTree (ttn : TypeTreeNode) = seq {
             |> Seq.map (sprintf "  %s")
 }
 
-let rec getPPtrs (tto : ITypeTreeObject) = seq {
+let rec getPPtrs (tto : ITypeTreeValue) = seq {
     match tto with
     | :? TypeTreeValue<PPtr> as v ->
         //printfn "Found PPtr: %A" v.Value
         yield v.Value
-    | :? TypeTreeValue<ITypeTreeObject[]> as arr ->
+    | :? TypeTreeValue<ITypeTreeValue[]> as arr ->
         yield! arr.Value |> Seq.collect getPPtrs
-    | :? TypeTreeObject as o ->
-        yield! o.Value.Values |> Seq.collect getPPtrs
+    | :? ITypeTreeObject as o ->
+        yield! o.ToDictionary().Values |> Seq.collect getPPtrs
     | _ -> ()
 }
 
 let invalidFileChars = Path.GetInvalidFileNameChars()
 
-let getName (tto : ITypeTreeObject) =
+let getName (tto : ITypeTreeValue) =
     match tto with
-    | :? TypeTreeObject as tto ->
+    | :? ITypeTreeObject as tto ->
         let name =
-            match tto.Value.TryGetValue("m_Name") with
+            match tto.ToDictionary().TryGetValue("m_Name") with
             | true, (:? TypeTreeValue<string> as name) -> name.Value
             | _ -> ""
 
@@ -145,7 +143,7 @@ let dumpStreamData dumpPath =
         //        sfReader |> ValueSome
         //try
         for objectInfo in sf.Objects do
-            let tto = TypeTreeObject.Get(sf, sfReader, objectInfo)
+            let tto = TypeTreeValue.Get(sf, sfReader, objectInfo)
 
             let sis =
                 tto.Find(fun tto -> tto :? TypeTreeValue<StreamingInfo>)
@@ -275,14 +273,14 @@ let dump outputDir =
 
         let ttObjects =
             sf.Objects
-            |> Seq.map (fun o -> o.Id, TypeTreeObject.Get(sf, reader, o))
+            |> Seq.map (fun o -> o.Id, TypeTreeValue.Get(sf, reader, o))
             |> Seq.cache
 
         for oid, tto in ttObjects do
             match tto with
-            | :? TypeTreeObject as tto ->
+            | :? ITypeTreeObject as tto ->
                 let name =
-                    match tto.Value.TryGetValue("m_Name") with
+                    match tto.ToDictionary().TryGetValue("m_Name") with
                     | true, (:? TypeTreeValue<string> as name) -> name.Value
                     | _ -> ""
 
@@ -389,8 +387,43 @@ let extRefs() =
 
     UnityFileSystem.Cleanup()
 
+let printTextureInfo() =
+    UnityFileSystem.Init()
+
+    use archive = UnityFileSystem.MountArchive(bundlePath, mountPoint)
+
+    for node in archive.Nodes |> Seq.where (fun n -> n.Flags.HasFlag(ArchiveNodeFlags.SerializedFile)) do
+        let path = $"{mountPoint}{node.Path}"
+        printfn "%s" path
+
+        use sf = UnityFileSystem.OpenSerializedFile(path)
+        use sfReader = new UnityBinaryFileReader(path)
+
+        let sw = Stopwatch.StartNew()
+        let mutable i = 0
+
+        
+        sf.Objects
+        |> Seq.map (fun o -> TypeTreeValue.Get(sf, sfReader, o))
+        |> Seq.choose(function :? Texture2D as t -> Some t | _ -> None)
+        |> Seq.iter(fun t ->
+            getName t
+            |> printfn "Trying to read texture \"%s\""
+                
+            let bytes = t.GetRawData(fun path _ ->
+                new UnityBinaryFileReader(path) |> ValueSome |> toMicroOption)
+
+            bytes.Length
+            |> printfn "  got %i bytes"
+        )
+
+
+    UnityFileSystem.Cleanup()
+
+
 printArchiveFiles()
 
 if fsi.CommandLineArgs.Length > 1 && fsi.CommandLineArgs[1] <> "" then
-    dump fsi.CommandLineArgs[1]
-    dumpStreamData fsi.CommandLineArgs[1]
+    //dump fsi.CommandLineArgs[1]
+    //dumpStreamData fsi.CommandLineArgs[1]
+    printTextureInfo()

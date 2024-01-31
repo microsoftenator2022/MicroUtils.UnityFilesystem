@@ -52,10 +52,10 @@ partial class StreamingInfoParser : IObjectParser
     internal static partial Regex PathRegex();
     public bool CanParse(TypeTreeNode node) => node.Type == "StreamingInfo";
     public Type ObjectType(TypeTreeNode _) => typeof(StreamingInfo);
-    public Option<ITypeTreeObject> TryParse(ITypeTreeObject obj, SerializedFile sf)
+    public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         if (!CanParse(obj.Node))
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
 
         var si = obj.TryGetObject();
         var path = si
@@ -73,11 +73,11 @@ partial class StreamingInfoParser : IObjectParser
         var size = si.Bind(si => si.TryGetField<uint>("size")).Map(size => size());
 
         if (path.IsNone || offset.IsNone || size.IsNone)
-            return Option<ITypeTreeObject>.None;
+            return Option<ITypeTreeValue>.None;
 
         var node = obj.Node;
 
-        return Option.Some<ITypeTreeObject>(new TypeTreeValue<StreamingInfo>(
+        return Option.Some<ITypeTreeValue>(new TypeTreeValue<StreamingInfo>(
             node,
             obj.Ancestors,
             obj.StartOffset,

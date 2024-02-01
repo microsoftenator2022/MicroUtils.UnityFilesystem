@@ -14,7 +14,7 @@ using UnityDataTools.FileSystem;
 
 public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawPath)
 {
-    public Option<byte[]> TryGetData(Func<string, int, Option<UnityBinaryFileReader>> getReader)
+    public Option<byte[]> TryGetData(Func<string, Option<UnityBinaryFileReader>> getReader)
     {
             var match = StreamingInfoParser.PathRegex().Match(RawPath);
             var mountPoint = match.Groups["MountPoint"].Value;
@@ -26,7 +26,7 @@ public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawP
 
         try
         {
-            var reader = getReader(path, (int)this.Size).DefaultWith(() => throw new KeyNotFoundException());
+            var reader = getReader(path).DefaultWith(() => throw new KeyNotFoundException());
 
             var data = new byte[this.Size];
 

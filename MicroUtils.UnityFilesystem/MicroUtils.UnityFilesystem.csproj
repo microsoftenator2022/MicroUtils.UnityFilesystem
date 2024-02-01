@@ -25,4 +25,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Kyaru.Texture2DDecoder" Version="0.17.0" />
+    <PackageReference Include="Kyaru.Texture2DDecoder.Windows" Version="0.1.0" />
+  </ItemGroup>
 </Project>

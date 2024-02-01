@@ -387,7 +387,7 @@ public static class TypeTreeValue
         return Option<Func<T?>>.None;
     }
 
-    public static Option<T[]> TryGetArray<T>(this ITypeTreeValue tto) => TryGetValue<T[]?>(tto).Bind(get => get().ToOption());
+    public static Option<T[]> TryGetArray<T>(this ITypeTreeValue tto) => TryGetValue<System.Array?>(tto).Bind(get => (get() as T[]).ToOption());
 
     public static Option<ITypeTreeValue[]> TryGetArray(this ITypeTreeValue tto) => TryGetArray<ITypeTreeValue>(tto);
 

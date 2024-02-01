@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MicroUtils.UnityFilesystem"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MicroUtils", "..\MicroUtils\MicroUtils.csproj", "{F1156674-18D3-459E-924A-E40E289600CE}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "BundleDumper", "BundleDumper\BundleDumper.fsproj", "{5E82656E-4614-419D-AC0D-58A4EE645D59}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,8 +23,15 @@ Global
 		{F1156674-18D3-459E-924A-E40E289600CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F1156674-18D3-459E-924A-E40E289600CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F1156674-18D3-459E-924A-E40E289600CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E82656E-4614-419D-AC0D-58A4EE645D59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E82656E-4614-419D-AC0D-58A4EE645D59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E82656E-4614-419D-AC0D-58A4EE645D59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E82656E-4614-419D-AC0D-58A4EE645D59}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {32E7B70D-0FB7-429F-9654-7F015FAE260B}
 	EndGlobalSection
 EndGlobal

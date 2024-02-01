@@ -1,10 +1,4 @@
-#r @"bin\Debug\net8.0\MicroUtils.dll"
-#r @"bin\Debug\net8.0\MicroUtils.UnityFileSystem.dll"
-
-//#r @"bin\Release\net8.0\MicroUtils.dll"
-//#r @"bin\Release\net8.0\MicroUtils.UnityFileSystem.dll"
-
-open System.Diagnostics
+﻿open System.Diagnostics
 open System.IO
 
 type MicroOption<'a> = MicroUtils.Functional.Option<'a>
@@ -14,6 +8,7 @@ open UnityDataTools.FileSystem
 
 open MicroUtils.UnityFilesystem
 open MicroUtils.UnityFilesystem.Parsers
+open MicroUtils.UnityFilesystem.Converters
 
 let mountPoint = @"archive:/"
 
@@ -157,7 +152,7 @@ let dumpStreamData dumpPath =
 
             for (filePath, si) in sis do
                 let data =
-                    si.TryGetData(fun path size ->
+                    si.TryGetData(fun path ->
                         new UnityBinaryFileReader(path) |> ValueSome |> toMicroOption)
                     |> toValueOption
 
@@ -387,7 +382,7 @@ let extRefs() =
 
     UnityFileSystem.Cleanup()
 
-let printTextureInfo() =
+let decodeTextures outputDir =
     UnityFileSystem.Init()
 
     use archive = UnityFileSystem.MountArchive(bundlePath, mountPoint)
@@ -399,31 +394,65 @@ let printTextureInfo() =
         use sf = UnityFileSystem.OpenSerializedFile(path)
         use sfReader = new UnityBinaryFileReader(path)
 
-        let sw = Stopwatch.StartNew()
-        let mutable i = 0
+        let mutable readers : Map<string, UnityBinaryFileReader> = Map.empty
 
-        
         sf.Objects
-        |> Seq.map (fun o -> TypeTreeValue.Get(sf, sfReader, o))
-        |> Seq.choose(function :? Texture2D as t -> Some t | _ -> None)
-        |> Seq.iter(fun t ->
-            getName t
-            |> printfn "Trying to read texture \"%s\""
-                
-            let bytes = t.GetRawData(fun path _ ->
-                new UnityBinaryFileReader(path) |> ValueSome |> toMicroOption)
+        |> Seq.map (fun o -> o, TypeTreeValue.Get(sf, sfReader, o))
+        |> Seq.choose(fun (o, t) -> match t with :? Texture2D as t -> Some (o, t) | _ -> None)
+        |> Seq.iter(fun (o, t) ->
+            //getName t
+            //|> printfn "Trying to read texture \"%s\""
+            
+            let getReader path =
+                readers |> Map.tryFind path
+                |> function
+                | Some reader -> reader
+                | _ ->
+                    let reader = new UnityBinaryFileReader(path)
+                    readers <- readers |> Map.add path reader
+                    reader
+                |> ValueSome
 
-            bytes.Length
-            |> printfn "  got %i bytes"
+            let fileName = Path.Join(outputDir, $"{getName t}.{o.Id}.png")
+            
+            if File.Exists(fileName) |> not then
+                let buf = Array.zeroCreate (t.Width * t.Height * 4)
+
+                let success = Texture2DConverter.DecodeTexture2D(t, System.Span(buf), fun path -> (getReader path |> toMicroOption))
+
+                if success then
+                    let format = System.Drawing.Imaging.PixelFormat.Format32bppArgb
+
+                    //printfn "Creating image..."
+
+                    use image = new System.Drawing.Bitmap(t.Width, t.Height, format)
+
+                    let rect = new System.Drawing.Rectangle(0, 0, t.Width, t.Height)
+                
+                    let data = image.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadWrite, format)
+                    let ptr = data.Scan0
+
+                    System.Runtime.InteropServices.Marshal.Copy(buf, 0, ptr, data.Stride * data.Height)
+                    image.UnlockBits(data)
+                    image.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY)
+
+                    //printfn $"Saving to {fileName}"    
+                    image.Save(fileName, System.Drawing.Imaging.ImageFormat.Png)
         )
 
+        for reader in readers |> Map.values do
+            reader.Dispose()
 
     UnityFileSystem.Cleanup()
 
+[<EntryPoint>]
+let main args =
 
-printArchiveFiles()
+    printArchiveFiles()
 
-if fsi.CommandLineArgs.Length > 1 && fsi.CommandLineArgs[1] <> "" then
-    //dump fsi.CommandLineArgs[1]
-    //dumpStreamData fsi.CommandLineArgs[1]
-    printTextureInfo()
+    if args.Length > 0 && args[0] <> "" then
+        //dump args[0]
+        //dumpStreamData args[0]
+        decodeTextures args[0]
+
+    0

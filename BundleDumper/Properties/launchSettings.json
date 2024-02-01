@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BundleDumper": {
+      "commandName": "Project",
+      "commandLineArgs": "\"D:\\dump\""
+    }
+  }
+}

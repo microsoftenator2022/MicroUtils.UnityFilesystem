@@ -1,42 +1,15 @@
 ﻿namespace MicroUtils.UnityFilesystem.Converters;
 
 using System;
-using System.Buffers;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 using MicroUtils.Functional;
 using MicroUtils.UnityFilesystem.Parsers;
 
 using Texture2DDecoder;
 
-//public static class BigArrayPool<T>
-//{
-//    private static readonly ArrayPool<T> s_shared = ArrayPool<T>.Create(64 * 1024 * 1024, 3);
-//    public static ArrayPool<T> Shared => s_shared;
-//}
-
 public static class Texture2DConverter
 {
-    //private AssetFileReader reader;
-    //private int m_Width;
-    //private int m_Height;
-    //private TextureFormat m_TextureFormat;
-    //private Version version;
-    //private BuildTarget platform;
-    //private int outPutSize;
-
-    //public Texture2DConverter(Texture2D m_Texture2D)
-    //{
-    //    this.reader = reader;
-    //    m_Width = m_Texture2D.m_Width;
-    //    m_Height = m_Texture2D.m_Height;
-    //    m_TextureFormat = m_Texture2D.m_TextureFormat;
-    //    version = reader.Version;
-    //    platform = reader.Platform;
-    //    outPutSize = m_Width * m_Height * 4;
-    //}
-
     private readonly ref struct TextureData(Texture2D texture, ReadOnlySpan<byte> rawData)
     {
         public readonly Texture2D Texture = texture;
@@ -58,32 +31,25 @@ public static class Texture2DConverter
         {
             Console.WriteLine($"Could not get data for {texture.ToDictionary()["m_Name"].GetValue<string>()}");
 
-            if (texture.ToDictionary().Keys.Any(k => k == "image data"))
-            {
-                var node = texture.ToDictionary()["image data"];
+            //if (texture.ToDictionary().Keys.Any(k => k == "image data"))
+            //{
+            //    var node = texture.ToDictionary()["image data"];
 
-                Console.WriteLine($"image data node type? {node.GetType()}");
-                Console.WriteLine($"image data is array? {node.IsArray()}");
-            }
+            //    Console.WriteLine($"image data node type? {node.GetType()}");
+            //    Console.WriteLine($"image data is array? {node.IsArray()}");
+            //}
 
             return false;
         }
 
         var td = new TextureData(texture, rawData);
 
-        //if (reader.BaseStream.Length == 0 || m_Width == 0 || m_Height == 0)
-        //{
-        //    return false;
-        //}
-        //var return false;
-        //var buff = BigArrayPool<byte>.Shared.Rent((int)reader.BaseStream.Length);
-        //reader.Read(buff, 0, (int)reader.BaseStream.Length);
         switch (texture.Format)
         {
             case TextureFormat.Alpha8: //test pass
                 return DecodeAlpha8(td, buffer);
             case TextureFormat.ARGB4444: //test pass
-                //SwapBytesForXbox(buff); // xbox360 only? :owlcat_suspecting:
+                //SwapBytesForXbox(buff);
                 return DecodeARGB4444(td, buffer);
             case TextureFormat.RGB24: //test pass
                 return DecodeRGB24(td, buffer);
@@ -203,12 +169,11 @@ public static class Texture2DConverter
             case TextureFormat.RGBA64: //test pass
                 return DecodeRGBA64(td, buffer);
         }
-        //BigArrayPool<byte>.Shared.Return(buff);
-        //return flag;
 
         return false;
     }
 
+    // xbox360 only? :owlcat_suspecting:
     //private static void SwapBytesForXbox(byte[] image_data)
     //{
     //    throw new NotImplementedException();
@@ -236,9 +201,6 @@ public static class Texture2DConverter
 
     private static bool DecodeARGB4444(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
-
-        //var pixelNew = new byte[4];
         for (var i = 0; i < texture.Size; i++)
         {
             var pixelNew = buff.Slice(i * 4, 4);
@@ -258,7 +220,6 @@ public static class Texture2DConverter
 
     private static bool DecodeRGB24(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
         for (var i = 0; i < texture.Size; i++)
         {
             buff[i * 4] = texture.RawData[i * 3 + 2];
@@ -295,7 +256,6 @@ public static class Texture2DConverter
 
     private static bool DecodeRGB565(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
         for (var i = 0; i < texture.Size; i++)
         {
             var p = BitConverter.ToUInt16(texture.RawData[(i * 2)..]);
@@ -309,7 +269,6 @@ public static class Texture2DConverter
 
     private static bool DecodeR16(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
         for (var i = 0; i < texture.Size; i++)
         {
             buff[i * 4] = 0; //b
@@ -328,8 +287,6 @@ public static class Texture2DConverter
 
     private static bool DecodeRGBA4444(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
-        //var pixelNew = new byte[4];
         for (var i = 0; i < texture.Size; i++)
         {
             var pixelNew = buff.Slice(i * 4, 4);
@@ -555,7 +512,6 @@ public static class Texture2DConverter
 
     private static bool DecodeRG16(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
         for (var i = 0; i < texture.Size; i++)
         {
             buff[i * 4] = 0; //B
@@ -568,7 +524,6 @@ public static class Texture2DConverter
 
     private static bool DecodeR8(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
         for (var i = 0; i < texture.Size; i++)
         {
             buff[i * 4] = 0; //B
@@ -621,7 +576,6 @@ public static class Texture2DConverter
 
     private static bool DecodeRGB48(TextureData texture, Span<byte> buff)
     {
-        //var size = m_Width * m_Height;
         for (var i = 0; i < texture.Size; i++)
         {
             buff[i * 4] = DownScaleFrom16BitTo8Bit(BitConverter.ToUInt16(texture.RawData[(i * 6 + 4)..]));     //b

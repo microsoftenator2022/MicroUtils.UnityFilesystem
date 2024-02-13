@@ -51,7 +51,7 @@ partial class StreamingInfoParser : IObjectParser
     [GeneratedRegex(@"^(?'MountPoint'.+?)[\\\/](?:(?'ParentPath'.+?)[\\\/])*(?'ResourcePath'.+)$")]
     internal static partial Regex PathRegex();
     public bool CanParse(TypeTreeNode node) => node.Type == "StreamingInfo";
-    public Type ObjectType(TypeTreeNode _) => typeof(StreamingInfo);
+    public Type ObjectType(TypeTreeNode _) => typeof(TypeTreeValue<StreamingInfo>);
     public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         if (!CanParse(obj.Node))

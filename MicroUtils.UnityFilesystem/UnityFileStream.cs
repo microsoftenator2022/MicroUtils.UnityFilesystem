@@ -1,9 +1,8 @@
 ﻿namespace MicroUtils.UnityFilesystem;
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -13,34 +12,15 @@ using UnityDataTools.FileSystem;
 
 public class UnityBinaryFileReader : IDisposable
 {
+    readonly ArrayPool<byte> ArrayPool = ArrayPool<byte>.Shared;
+
     readonly UnityFileStream stream;
     readonly BinaryReader reader;
 
-#if DEBUG
-    readonly bool DebugData = false;
-
-#pragma warning disable CS0612 // Type or member is obsolete
-    UnityFileReader oldReader;
-#pragma warning restore CS0612 // Type or member is obsolete
-#endif
-
-    public UnityBinaryFileReader(string path, int bufferSize = 4096
-#if DEBUG
-        , bool debugData = false
-#endif
-        )
+    public UnityBinaryFileReader(string path, int bufferSize = 4096)
     {
         this.stream = new(path, bufferSize);
         this.reader = new(this.stream);
-#if DEBUG
-        if (debugData)
-            this.oldReader = new(path, 256 * 1024 * 1024);
-        else
-            this.oldReader = null!;
-
-        this.DebugData = debugData;
-#endif
-
     }
 
     long Seek(long fileOffset) =>
@@ -49,44 +29,30 @@ public class UnityBinaryFileReader : IDisposable
     public void ReadArray(long fileOffset, int size, Array dest)
     {
         this.Seek(fileOffset);
-        
-        var buffer = reader.ReadBytes(size);
 
-        Buffer.BlockCopy(buffer, 0, dest, 0, size);
-#if DEBUG
-        if (!DebugData)
-            return;
+        //var buffer = reader.ReadBytes(size);
 
-        var buffer2 = new byte[size];
+        var buffer = ArrayPool.Rent(size);
 
-        oldReader.ReadArray(fileOffset, size, dest);
-
-        Buffer.BlockCopy(dest, 0, buffer2, 0, size);
-
-        for (var i = 0; i < buffer.Length; i++)
+        try
         {
-            if (buffer[i] != buffer2[i])
-                throw new InvalidDataException();
+            stream.Read(buffer.AsSpan(0, size));
+
+            Buffer.BlockCopy(buffer, 0, dest, 0, size);
         }
-#endif
+        finally
+        {
+            ArrayPool.Return(buffer);
+        }
     }
 
     public string ReadString(long fileOffset, int size)
     {
         this.Seek(fileOffset);
-        
         var buffer = reader.ReadBytes(size);
 
         var s = Encoding.Default.GetString(buffer);
-#if DEBUG
-        if (!DebugData)
-            return s;
 
-        var s2 = oldReader.ReadString(fileOffset, size);
-
-        if (s != s2)
-            throw new InvalidDataException();
-#endif
         return s;
 
     }
@@ -95,15 +61,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadSingle();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadFloat(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -111,15 +69,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadDouble();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadDouble(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -127,15 +77,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadInt64();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadInt64(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -143,15 +85,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadUInt64();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadUInt64(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -159,15 +93,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadInt32();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadInt32(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -175,15 +101,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadUInt32();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadUInt32(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -191,15 +109,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadInt16();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadInt16(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -207,14 +117,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadUInt16();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadUInt16(fileOffset);
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -222,15 +125,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadSByte();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadInt8(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -238,15 +133,7 @@ public class UnityBinaryFileReader : IDisposable
     {
         this.Seek(fileOffset);
         var x = reader.ReadByte();
-#if DEBUG
-        if (!DebugData)
-            return x;
 
-        var x2 = oldReader.ReadUInt8(fileOffset);
-
-        if (x != x2)
-            throw new InvalidDataException();
-#endif
         return x;
     }
 
@@ -485,4 +372,3 @@ internal class UnityFileStream : Stream
         base.Dispose(disposing);
     }
 }
-

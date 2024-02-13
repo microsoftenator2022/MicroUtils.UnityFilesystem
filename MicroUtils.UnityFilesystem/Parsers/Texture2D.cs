@@ -10,17 +10,14 @@ using MicroUtils.Functional;
 
 using UnityDataTools.FileSystem;
 
-public record class Texture2D(int Width, int Height, TextureFormat Format, TypeTreeObject TypeTreeObject) : ITypeTreeObject
+public readonly record struct Texture2D(int Width, int Height, TextureFormat Format, TypeTreeObject TypeTreeObject) : ITypeTreeObject
 {
     public ITypeTreeValue this[string key] => ((ITypeTreeObject)TypeTreeObject)[key];
-
     public TypeTreeNode Node => TypeTreeObject.Node;
-
     public MicroStack<TypeTreeNode> Ancestors => TypeTreeObject.Ancestors;
-
     public long StartOffset => TypeTreeObject.StartOffset;
-
     public long EndOffset => TypeTreeObject.EndOffset;
+    public IDictionary<string, ITypeTreeValue> ToDictionary() => TypeTreeObject.ToDictionary();
 
     public byte[] GetRawData(Func<string, Option<UnityBinaryFileReader>> getReader)
     {
@@ -31,14 +28,12 @@ public record class Texture2D(int Width, int Height, TextureFormat Format, TypeT
 
         return this["m_StreamData"].TryGetValue<StreamingInfo>().Bind(get => get().TryGetData(getReader)).DefaultValue([]);
     }
-
-    public IDictionary<string, ITypeTreeValue> ToDictionary() => TypeTreeObject.ToDictionary();
 }
 
 partial class Texture2DParser : IObjectParser
 {
     public bool CanParse(TypeTreeNode node) => node.Type == "Texture2D";
-    public Type ObjectType(TypeTreeNode node) => typeof(Texture2D);
+    public Type ObjectType(TypeTreeNode _) => typeof(Texture2D);
 
     Option<Texture2D> TryCreate(TypeTreeObject tto)
     {
@@ -46,7 +41,7 @@ partial class Texture2DParser : IObjectParser
         var height = tto.TryGetField<int>("m_Height").Map(get => get());
         var format = tto.TryGetField<int>("m_TextureFormat").Map(get => (TextureFormat)get());
 
-        var create = Option.Some(new Unit()).Map<Unit, Func<int, int, Func<TextureFormat, Texture2D>>>(_ =>
+        var create = Option<Func<int, int, Func<TextureFormat, Texture2D>>>.Some(
             (width, height) =>
             format => new Texture2D(width, height, format, tto));
 

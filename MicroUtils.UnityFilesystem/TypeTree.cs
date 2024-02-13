@@ -9,6 +9,7 @@ using MicroUtils.Functional;
 using MicroUtils.UnityFilesystem.Parsers;
 
 using UnityDataTools.FileSystem;
+using System.Reflection;
 
 public interface ITypeTreeValue
 {
@@ -159,10 +160,12 @@ public static class TypeTreeUtil
 {
     public static long AlignOffset(long offset, TypeTreeNode node)
     {
-        if (node.MetaFlags.HasFlag(TypeTreeMetaFlags.AlignBytes)
-            ||
-            node.MetaFlags.HasFlag(TypeTreeMetaFlags.AnyChildUsesAlignBytes)
-            )
+        //if (node.MetaFlags.HasFlag(TypeTreeMetaFlags.AlignBytes) ||
+        //    node.MetaFlags.HasFlag(TypeTreeMetaFlags.AnyChildUsesAlignBytes))
+
+        var alignBytes = node.MetaFlags & (TypeTreeMetaFlags.AlignBytes | TypeTreeMetaFlags.AnyChildUsesAlignBytes);
+
+        if (alignBytes != 0)
         {
             return (offset + 3L) & (~(3L));
         }
@@ -379,15 +382,60 @@ public static class TypeTreeValue
         }
     }
 
-    public static Option<Func<T?>> TryGetValue<T>(this ITypeTreeValue tto)
+    public static Option<Func<T>> TryGetValue<T>(this ITypeTreeValue tto)
     {
-        if (tto is TypeTreeValue<T?> obj)
+        if (tto is TypeTreeValue<T> obj)
             return Option.Some(() => obj.Value);
 
-        return Option<Func<T?>>.None;
+        var type = tto.GetType();
+
+        var p = type.GetProperty("Value");
+
+        if (p is not null && typeof(T).IsAssignableFrom(p.PropertyType))
+        {
+            return Option.Some(() => (T)p.GetValue(tto)!);
+        }
+
+        return Option<Func<T>>.None;
     }
 
-    public static Option<T[]> TryGetArray<T>(this ITypeTreeValue tto) => TryGetValue<System.Array?>(tto).Bind(get => (get() as T[]).ToOption());
+    public static Option<T[]> TryGetArray<T>(this ITypeTreeValue tto) =>
+        TryGetValue<System.Array?>(tto).Bind(get =>
+        {
+            var value = get();
+
+            if (value is null)
+                return Option<T[]>.None;
+
+            if (value is T[] arr)
+                return Option.Some(arr);
+
+            if (value.Length == 0)
+                return Option<T[]>.Some([]);
+
+            if (value is ITypeTreeValue[] ttArray)
+            {
+                return Option.Some(
+                    ttArray.Select(x =>
+                    {
+                        if (x is T t)
+                            return t;
+
+                        if (x is TypeTreeValue<T> tt)
+                            return tt.Value;
+
+                        else
+                        {
+                            throw new InvalidCastException();
+                        }
+                    }).ToArray());
+            }
+
+            if (value.OfType<T>().Count() != value.Length)
+                return Option<T[]>.None;
+
+            return value.ToOption().Map(arr => arr.Cast<T>().ToArray());
+        });
 
     public static Option<ITypeTreeValue[]> TryGetArray(this ITypeTreeValue tto) => TryGetArray<ITypeTreeValue>(tto);
 
@@ -402,18 +450,21 @@ public static class TypeTreeValue
         return Option<ITypeTreeObject>.None;
     }
 
-    public static Option<Func<T?>> TryGetField<T>(this ITypeTreeObject tto, string fieldName)
+    public static Option<Func<T>> TryGetField<T>(this ITypeTreeObject tto, string fieldName)
     {
         if (tto.ToDictionary().TryGetValue(fieldName, out var value))
-            return value.TryGetValue<T?>();
+            return value.TryGetValue<T>();
 
-        return Option<Func<T?>>.None;
+        return Option<Func<T>>.None;
     }
 
-    public static T? GetValue<T>(this ITypeTreeValue tto) => tto.TryGetValue<T>().MaybeValue is Func<T?> f ? f() : default;
+    public static T GetValue<T>(this ITypeTreeValue tto) => tto.TryGetValue<T>().Value();
 
     public static bool IsObject(this ITypeTreeValue tto) => tto is ITypeTreeObject;
     public static bool IsArray(this ITypeTreeValue tto) => tto is TypeTreeValue<System.Array>;
+
+    public static TypeTreeValue<T> WithValue<T>(this ITypeTreeValue ttValue, T value) =>
+        new(ttValue.Node, ttValue.Ancestors, ttValue.StartOffset, ttValue.EndOffset, value);
 
     //public static T? TryGetFieldValue<T>(this TypeTreeValue<Dictionary<string, ITypeTreeObject>> tto, string fieldName) =>
     //    tto.TryGetField<T>(fieldName).DefaultValue(() => default!)();

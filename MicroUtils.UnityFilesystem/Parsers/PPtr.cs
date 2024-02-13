@@ -36,8 +36,8 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
             }
             else
             {
+                // FileID = 0 is "this file", so FileID = 1 is index 0 in the external references list
                 path = thisFile.ExternalReferences[this.FileID - 1].Path;
-                // Because FileID = 0 is "this file", FileID = 1 is index 0 in the external references list
                 referenceFile = getSerializedFile(path).DefaultWith(() => throw new KeyNotFoundException());
             }
 
@@ -63,8 +63,8 @@ partial class PPtrParser : IObjectParser
     [GeneratedRegex(@"^PPtr<(\w+)>$")]
     internal static partial Regex PPtrPattern();
 
-    public bool CanParse(TypeTreeNode node) => PPtrPattern().IsMatch(node.Type);
-    public Type ObjectType(TypeTreeNode _) => typeof(PPtr);
+    public bool CanParse(TypeTreeNode node) => node.Type.StartsWith("PPtr") && PPtrPattern().IsMatch(node.Type);
+    public Type ObjectType(TypeTreeNode _) => typeof(TypeTreeValue<PPtr>);
     public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         var match = PPtrPattern().Match(obj.NodeType());

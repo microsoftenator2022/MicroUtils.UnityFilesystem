@@ -29,7 +29,7 @@ public static class Texture2DConverter
 
         if (rawData.Length == 0)
         {
-            Console.WriteLine($"Could not get data for {texture.ToDictionary()["m_Name"].GetValue<string>()}");
+            Console.Error.WriteLine($"Could not get data for {texture.ToDictionary()["m_Name"].GetValue<string>()}");
 
             //if (texture.ToDictionary().Keys.Any(k => k == "image data"))
             //{
@@ -304,7 +304,7 @@ public static class Texture2DConverter
 
     private static bool DecodeBGRA32(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = texture.RawData[i];
             buff[i + 1] = texture.RawData[i + 1];
@@ -316,7 +316,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRHalf(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = 0;
             buff[i + 1] = 0;
@@ -328,7 +328,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRGHalf(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = 0;
             buff[i + 1] = (byte)Math.Round((float)BitConverter.ToHalf(texture.RawData[(i + 2)..]) * 255f);
@@ -340,7 +340,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRGBAHalf(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = (byte)Math.Round((float)BitConverter.ToHalf(texture.RawData[(i * 2 + 4)..]) * 255f);
             buff[i + 1] = (byte)Math.Round((float)BitConverter.ToHalf(texture.RawData[(i * 2 + 2)..]) * 255f);
@@ -352,7 +352,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRFloat(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = 0;
             buff[i + 1] = 0;
@@ -364,7 +364,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRGFloat(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = 0;
             buff[i + 1] = (byte)Math.Round(BitConverter.ToSingle(texture.RawData[(i * 2 + 4)..]) * 255f);
@@ -376,7 +376,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRGBAFloat(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = (byte)Math.Round(BitConverter.ToSingle(texture.RawData[(i * 4 + 8)..]) * 255f);
             buff[i + 1] = (byte)Math.Round(BitConverter.ToSingle(texture.RawData[(i * 4 + 4)..]) * 255f);
@@ -422,7 +422,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRGB9e5Float(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             var n = BitConverter.ToInt32(texture.RawData[i..]);
             var scale = n >> 27 & 0x1f;
@@ -564,7 +564,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRG32(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = 0;                                                                                //b
             buff[i + 1] = DownScaleFrom16BitTo8Bit(BitConverter.ToUInt16(texture.RawData[(i + 2)..]));  //g
@@ -588,7 +588,7 @@ public static class Texture2DConverter
 
     private static bool DecodeRGBA64(TextureData texture, Span<byte> buff)
     {
-        for (var i = 0; i < texture.Size * 4; i++)
+        for (var i = 0; i < texture.Size * 4; i += 4)
         {
             buff[i] = DownScaleFrom16BitTo8Bit(BitConverter.ToUInt16(texture.RawData[(i * 2 + 4)..]));     //b
             buff[i + 1] = DownScaleFrom16BitTo8Bit(BitConverter.ToUInt16(texture.RawData[(i * 2 + 2)..])); //g

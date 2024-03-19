@@ -13,11 +13,41 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 {
     public static readonly PPtr NullPtr = new();
 
+    public string GetReferencePath(Func<string, Option<SerializedFile>> getSerializedFile)
+    {
+        string path = "Unknown";
+
+        try
+        {
+            var thisFile = getSerializedFile(this.SerializedFilePath).DefaultWith(() => throw new KeyNotFoundException());
+
+            //SerializedFile referenceFile;
+
+            if (this.FileID == 0)
+            {
+                path = thisFile.Path;
+            }
+            else
+            {
+                // FileID = 0 is "this file", so FileID = 1 is index 0 in the external references list
+                path = thisFile.ExternalReferences[this.FileID - 1].Path;
+
+                path = new UnityReferencePath(path).ToFilePath();
+            }
+        }
+        catch
+        {
+            Console.Error.WriteLine($"Could not get reader for FileID {FileID} = {path}");
+        }
+
+        return path;
+    }
+
     public Option<ITypeTreeValue> TryDereference(Func<string, Option<SerializedFile>> getSerializedFile, Func<string, Option<UnityBinaryFileReader>> getReader)
     {
         if (this == NullPtr)
         {
-            Console.WriteLine("Tried to dereference nullptr");
+            Console.Error.WriteLine("Tried to dereference nullptr");
             return Option<ITypeTreeValue>.None;
         }
 
@@ -25,19 +55,29 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 
         try
         {
-            var thisFile = getSerializedFile(this.SerializedFilePath).DefaultWith(() => throw new KeyNotFoundException());
-            
             SerializedFile referenceFile;
 
             if (this.FileID == 0)
             {
+                var thisFile = getSerializedFile(this.SerializedFilePath).DefaultWith(() => throw new KeyNotFoundException());
+
                 path = thisFile.Path;
                 referenceFile = thisFile;
             }
             else
             {
-                // FileID = 0 is "this file", so FileID = 1 is index 0 in the external references list
-                path = thisFile.ExternalReferences[this.FileID - 1].Path;
+                path = GetReferencePath(getSerializedFile);
+
+                //// FileID = 0 is "this file", so FileID = 1 is index 0 in the external references list
+                //path = thisFile.ExternalReferences[this.FileID - 1].Path;
+
+                ////var match = PPtrParser.PathRegex().Match(path);
+                ////var mountPoint = match.Groups["MountPoint"].Value;
+                ////var archive = match.Groups["ParentPath"].Value;
+                ////var file = match.Groups["ResourcePath"].Value;
+
+                //path = new UnityReferencePath(path).ToFilePath();
+
                 referenceFile = getSerializedFile(path).DefaultWith(() => throw new KeyNotFoundException());
             }
 
@@ -49,7 +89,7 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
         }
         catch (Exception e) when (e is KeyNotFoundException or IndexOutOfRangeException)
         {
-            Console.WriteLine($"Could not get reader for FileID {FileID} = {path}");
+            Console.Error.WriteLine($"Could not get reader for FileID {FileID} = {path}");
             return Option<ITypeTreeValue>.None;
         }
     }
@@ -60,11 +100,14 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 
 partial class PPtrParser : IObjectParser
 {
-    [GeneratedRegex(@"^PPtr<(\w+)>$")]
+    //[GeneratedRegex(@"^(?'MountPoint'.+?)[\\\/](?:(?'ParentPath'.+?)[\\\/])*(?'ResourcePath'.+)$")]
+    //internal static partial Regex PathRegex();
+
+    [GeneratedRegex(@"^PPtr<\$?(\w+)>$")]
     internal static partial Regex PPtrPattern();
 
     public bool CanParse(TypeTreeNode node) => node.Type.StartsWith("PPtr") && PPtrPattern().IsMatch(node.Type);
-    public Type ObjectType(TypeTreeNode _) => typeof(TypeTreeValue<PPtr>);
+    public Type ObjectType(TypeTreeNode _) => typeof(PPtr);
     public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         var match = PPtrPattern().Match(obj.NodeType());

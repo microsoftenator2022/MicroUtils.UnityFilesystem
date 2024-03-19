@@ -14,13 +14,17 @@ using UnityDataTools.FileSystem;
 
 public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawPath)
 {
+    public string GetReferencePath() => new UnityReferencePath(RawPath).ToFilePath();
+
     public Option<byte[]> TryGetData(Func<string, Option<UnityBinaryFileReader>> getReader)
     {
-            var match = StreamingInfoParser.PathRegex().Match(RawPath);
-            var mountPoint = match.Groups["MountPoint"].Value;
-            var archive = match.Groups["ParentPath"].Value;
-            var file = match.Groups["ResourcePath"].Value;
-            var path = $"{mountPoint}/{file}";
+            //var match = StreamingInfoParser.PathRegex().Match(RawPath);
+            //var mountPoint = match.Groups["MountPoint"].Value;
+            //var archive = match.Groups["ParentPath"].Value;
+            //var file = match.Groups["ResourcePath"].Value;
+            //var path = $"{mountPoint}/{file}";
+
+        var path = this.GetReferencePath();
 
         //Console.WriteLine($"Get stream from file: {path}, offset = {this.Offset}, size = {this.Size}");
 
@@ -37,9 +41,9 @@ public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawP
         catch (Exception e)
         {
             if (e is KeyNotFoundException)
-                Console.WriteLine($"Could not get {path} reader for {this}");
+                Console.Error.WriteLine($"Could not get {path} reader for {this}");
             else
-                Console.WriteLine(e.ToString());
+                Console.Error.WriteLine(e.ToString());
 
             return Option<byte[]>.None;
         }
@@ -48,8 +52,8 @@ public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawP
 
 partial class StreamingInfoParser : IObjectParser
 {
-    [GeneratedRegex(@"^(?'MountPoint'.+?)[\\\/](?:(?'ParentPath'.+?)[\\\/])*(?'ResourcePath'.+)$")]
-    internal static partial Regex PathRegex();
+    //[GeneratedRegex(@"^(?'MountPoint'.+?)[\\\/](?:(?'ParentPath'.+?)[\\\/])*(?'ResourcePath'.+)$")]
+    //internal static partial Regex PathRegex();
     public bool CanParse(TypeTreeNode node) => node.Type == "StreamingInfo";
     public Type ObjectType(TypeTreeNode _) => typeof(TypeTreeValue<StreamingInfo>);
     public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)

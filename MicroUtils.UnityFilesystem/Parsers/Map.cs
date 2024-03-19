@@ -33,7 +33,7 @@ namespace MicroUtils.UnityFilesystem.Parsers
     class MapParser : IObjectParser
     {
         public bool CanParse(TypeTreeNode node) => node.Type == "map";
-        public Type ObjectType(TypeTreeNode node) => typeof(Map);
+        public Type ObjectType(TypeTreeNode node) => typeof(TypeTreeValue<Map>);
         public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
         {
             if (obj is not ITypeTreeObject o)

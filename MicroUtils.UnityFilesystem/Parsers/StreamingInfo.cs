@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -12,21 +13,29 @@ using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
 
-public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawPath)
+public readonly record struct StreamingInfo(ulong Offset, ulong Size, string RawPath)
 {
     public string GetReferencePath() => new UnityReferencePath(RawPath).ToFilePath();
 
+    public Option<byte[]> TryGetData()
+    {
+        var size = this.Size;
+        UnityBinaryFileReader? reader = null;
+        Option<UnityBinaryFileReader> getReader(string path) => Option.Some(new UnityBinaryFileReader(path, (int)size));
+        
+        var result = TryGetData(getReader);
+
+        reader?.Dispose();
+
+        return result;
+    }
+
     public Option<byte[]> TryGetData(Func<string, Option<UnityBinaryFileReader>> getReader)
     {
-            //var match = StreamingInfoParser.PathRegex().Match(RawPath);
-            //var mountPoint = match.Groups["MountPoint"].Value;
-            //var archive = match.Groups["ParentPath"].Value;
-            //var file = match.Groups["ResourcePath"].Value;
-            //var path = $"{mountPoint}/{file}";
 
         var path = this.GetReferencePath();
 
-        //Console.WriteLine($"Get stream from file: {path}, offset = {this.Offset}, size = {this.Size}");
+        Console.WriteLine($"Get stream from file: {path}, offset = {this.Offset}, size = {this.Size}");
 
         try
         {
@@ -45,7 +54,17 @@ public readonly record struct StreamingInfo(ulong Offset, uint Size, string RawP
             else
                 Console.Error.WriteLine(e.ToString());
 
-            return Option<byte[]>.None;
+            Console.WriteLine("Falling back to UnityFileReader");
+
+            using var reader = new UnityFileReader(path, (int)this.Size);
+            
+            var data = new byte[this.Size];
+
+            reader.ReadArray((long)this.Offset, (int)this.Size, data);
+
+            return Option.Some(data);
+
+            //return Option<byte[]>.None;
         }
     }
 }
@@ -54,7 +73,7 @@ partial class StreamingInfoParser : IObjectParser
 {
     //[GeneratedRegex(@"^(?'MountPoint'.+?)[\\\/](?:(?'ParentPath'.+?)[\\\/])*(?'ResourcePath'.+)$")]
     //internal static partial Regex PathRegex();
-    public bool CanParse(TypeTreeNode node) => node.Type == "StreamingInfo";
+    public bool CanParse(TypeTreeNode node) => node.Type == "StreamingInfo" || node.Type == "StreamedResource";
     public Type ObjectType(TypeTreeNode _) => typeof(TypeTreeValue<StreamingInfo>);
     public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
@@ -62,19 +81,41 @@ partial class StreamingInfoParser : IObjectParser
             return Option<ITypeTreeValue>.None;
 
         var si = obj.TryGetObject();
-        var path = si
-            .Bind(si => si.TryGetField<string?>("path"))
-            .Bind(path => 
-            {
-                var s = path();
-                if (string.IsNullOrEmpty(s))
-                    return Option<string>.None;
 
-                return Option.Some(s);
-            });
+        //Option<string> path = Option<string>.None;
+        //Option<ulong> offset = Option<ulong>.None;
+        //Option<uint> size = Option<uint>.None;
 
-        var offset = si.Bind(si => si.TryGetField<ulong>("offset")).Map(offset => offset());
-        var size = si.Bind(si => si.TryGetField<uint>("size")).Map(size => size());
+        var (path, offset, size) = obj.Node.Type switch
+        {
+            "StreamingInfo" => 
+                (si
+                  .Bind(si => si.TryGetField<string?>("path"))
+                    .Bind(path => 
+                    {
+                        var s = path();
+                        if (string.IsNullOrEmpty(s))
+                            return Option<string>.None;
+
+                        return Option.Some(s);
+                    }),
+                    si.Bind(si => si.TryGetField<ulong>("offset")).Map(offset => offset()),
+                    si.Bind(si => si.TryGetField<uint>("size")).Map(size => (ulong)(size()))),
+            "StreamedResource" =>
+                (si
+                  .Bind(si => si.TryGetField<string?>("m_Source"))
+                    .Bind(path =>
+                    {
+                        var s = path();
+                        if (string.IsNullOrEmpty(s))
+                            return Option<string>.None;
+
+                        return Option.Some(s);
+                    }),
+                    si.Bind(si => si.TryGetField<ulong>("m_Offset")).Map(offset => offset()),
+                    si.Bind(si => si.TryGetField<ulong>("m_Size")).Map(size => size())),
+            _ => (Option<string>.None, Option<ulong>.None, Option<ulong>.None)
+        };
 
         if (path.IsNone || offset.IsNone || size.IsNone)
             return Option<ITypeTreeValue>.None;

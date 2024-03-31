@@ -256,7 +256,7 @@ internal class UnityFileStream : Stream
                     throw new Exception($"positionInternal != bufferStartOffset + bytesInBuffer : {positionInternal} != {bufferStartOffset + bytesInBuffer}");
                 }
 #endif
-                ReadFromFile();
+                var readCount = ReadFromFile();
 #if DEBUG
                 if (positionInternal != bufferStartOffset + bytesInBuffer)
                 {
@@ -265,6 +265,7 @@ internal class UnityFileStream : Stream
 
                 if (bytesInBuffer <= 0)
                 {
+                    Console.Error.WriteLine($"Read {readCount} bytes, bytes in buffer = {bytesInBuffer}");
                     throw new Exception($"bytesInBuffer <= 0 : {bytesInBuffer}");
                 }
 #endif

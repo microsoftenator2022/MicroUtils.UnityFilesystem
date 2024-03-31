@@ -15,6 +15,12 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 
     public string GetReferencePath(Func<string, Option<SerializedFile>> getSerializedFile)
     {
+        if (this == NullPtr)
+        {
+            Console.Error.WriteLine("Tried to dereference nullptr");
+            return "";
+        }
+
         string path = "Unknown";
 
         try
@@ -37,7 +43,8 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
         }
         catch
         {
-            Console.Error.WriteLine($"Could not get reader for FileID {FileID} = {path}");
+
+            Console.Error.WriteLine($"{this} Could not get reader for FileID {FileID} = {path}");
         }
 
         return path;
@@ -89,7 +96,7 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
         }
         catch (Exception e) when (e is KeyNotFoundException or IndexOutOfRangeException)
         {
-            Console.Error.WriteLine($"Could not get reader for FileID {FileID} = {path}");
+            Console.Error.WriteLine($"{this} Could not get reader for FileID {FileID} = {path}");
             return Option<ITypeTreeValue>.None;
         }
     }

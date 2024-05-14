@@ -34,7 +34,7 @@ tree node). **Therefore: you must parse every node**.
 - `StreamingInfo` and `StreamedResource`: Pointer to unstructured data (ie. `byte[]`)
 - `PPtr`: Typed reference to some other object by path ID (`ObjectInfo.Id`) and file ID.
     
-    If `fileId == 0`, the reference points to an object the same serialized file.
+    If `fileId == 0`, the reference points to an object in the same serialized file.
     
     If `fileId > 0` then `fileId - 1` is an index into the external references array.
     

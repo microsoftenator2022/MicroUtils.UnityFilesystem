@@ -17,7 +17,7 @@ These (may) contain:
 ## `TypeTreeNode`
 Serialized files describe structured data using type trees (`TypeTreeNode`)
 
-The described data is something like a variable-sized struct: Field values may be "inlined" ie. serialized in-place.
+The described data is something like a variable-sized struct: Field values of C# reference types may be "inlined" ie. serialized in-place.
 
 Type trees are stored in the bundle alongside the data (with some exceptions that I do not currently handle)
 

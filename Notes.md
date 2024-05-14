@@ -38,4 +38,4 @@ tree node). **Therefore: you must parse every node**.
     
     If `fileId > 0` then `fileId - 1` is an index into the external references array.
     
-- Fixed-size array: a set values named `data[i]`, where `i` is the index.
+- Fixed-size array: a set of values named `data[i]`, where `i` is the index.

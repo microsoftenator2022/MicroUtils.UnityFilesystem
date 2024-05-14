@@ -14,7 +14,7 @@ These (may) contain:
 - Objects - `ObjectInfo`: object type, path ID, data offset
 - External references - `ExternalReference`: path to some other file
 
-## `TypeTreeNode``
+## `TypeTreeNode`
 Serialized files describe structured data using type trees (`TypeTreeNode`)
 
 The described sdata is something like a variable-sized struct: Field values may be "inlined" ie. serialized in-place.

@@ -26,7 +26,7 @@ A type tree corresponds roughly to a C# class.
 There are some "primitive" types: C# integral types (integer and floating-point numbers, characters (UTF-8 encoding?)),
 arrays (of any type), strings (special case arrays)
 
-These trees are parsed in-order and depth-first. Each node's offset is from the end of the previous value.
+The tree is parsed in-order and depth-first. Each node's offset is from the end of the previous value.
 There may be padding added to the end of a value for "alignment" or to its child nodes (indicated by flags on the type 
 tree node). **Therefore: you must parse every node**.
 

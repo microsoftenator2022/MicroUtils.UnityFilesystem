@@ -19,7 +19,7 @@ Serialized files describe structured data using type trees (`TypeTreeNode`)
 
 The described data is something like a variable-sized struct: Field values may be "inlined" ie. serialized in-place.
 
-Type trees are (usually) stored in the bundle alongside the data (with some exceptions that I do not currently handle)
+Type trees are stored in the bundle alongside the data (with some exceptions that I do not currently handle)
 
 A type tree corresponds roughly to a C# class.
 

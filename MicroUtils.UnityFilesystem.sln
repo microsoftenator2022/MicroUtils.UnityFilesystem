@@ -7,7 +7,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MicroUtils.UnityFilesystem"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MicroUtils", "..\MicroUtils\MicroUtils.csproj", "{F1156674-18D3-459E-924A-E40E289600CE}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "BundleDumper", "BundleDumper\BundleDumper.fsproj", "{5E82656E-4614-419D-AC0D-58A4EE645D59}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "BundleDumper", "BundleDumper\BundleDumper.fsproj", "{5E82656E-4614-419D-AC0D-58A4EE645D59}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D2206A7B-87CF-4571-AE21-6B339B2ABB91}"
+	ProjectSection(SolutionItems) = preProject
+		Notes.md = Notes.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

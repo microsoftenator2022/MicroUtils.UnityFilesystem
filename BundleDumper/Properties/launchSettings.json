@@ -2,8 +2,8 @@
   "profiles": {
     "BundleDumper": {
       "commandName": "Project",
-      "commandLineArgs": "\"D:\\SteamLibrary\\steamapps\\common\\Warhammer 40,000 Rogue Trader\\Bundles\\ui\"",
-      "workingDirectory": "D:\\bundle_dump"
+      "commandLineArgs": "\"D:\\SteamLibrary\\steamapps\\common\\Warhammer 40,000 Rogue Trader\\Bundles\\ui_atlaselements_atlas.ui_atlas\"",
+      "workingDirectory": "Q:\\bundle_dump"
     }
   }
 }

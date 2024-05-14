@@ -16,7 +16,7 @@ public static class UnityFileSystem
             HandleErrors(r);
         }
     }
-        
+    
     public static void Cleanup()
     {
         // Uninitialize the native library.

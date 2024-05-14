@@ -34,8 +34,9 @@ public readonly record struct StreamingInfo(ulong Offset, ulong Size, string Raw
     {
 
         var path = this.GetReferencePath();
-
+        #if DEBUG
         Console.WriteLine($"Get stream from file: {path}, offset = {this.Offset}, size = {this.Size}");
+        #endif
 
         try
         {
@@ -63,16 +64,12 @@ public readonly record struct StreamingInfo(ulong Offset, ulong Size, string Raw
             reader.ReadArray((long)this.Offset, (int)this.Size, data);
 
             return Option.Some(data);
-
-            //return Option<byte[]>.None;
         }
     }
 }
 
 partial class StreamingInfoParser : IObjectParser
 {
-    //[GeneratedRegex(@"^(?'MountPoint'.+?)[\\\/](?:(?'ParentPath'.+?)[\\\/])*(?'ResourcePath'.+)$")]
-    //internal static partial Regex PathRegex();
     public bool CanParse(TypeTreeNode node) => node.Type == "StreamingInfo" || node.Type == "StreamedResource";
     public Type ObjectType(TypeTreeNode _) => typeof(TypeTreeValue<StreamingInfo>);
     public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
@@ -81,10 +78,6 @@ partial class StreamingInfoParser : IObjectParser
             return Option<ITypeTreeValue>.None;
 
         var si = obj.TryGetObject();
-
-        //Option<string> path = Option<string>.None;
-        //Option<ulong> offset = Option<ulong>.None;
-        //Option<uint> size = Option<uint>.None;
 
         var (path, offset, size) = obj.Node.Type switch
         {

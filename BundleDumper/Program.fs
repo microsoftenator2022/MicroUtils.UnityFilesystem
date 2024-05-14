@@ -1,5 +1,9 @@
-﻿open System.Diagnostics
+﻿#nowarn "3391"
+
+open System.Diagnostics
 open System.IO
+
+open Newtonsoft.Json.Linq
 
 type MicroOption<'a> = MicroUtils.Functional.Option<'a>
 
@@ -12,15 +16,17 @@ open MicroUtils.UnityFilesystem.Converters
 
 let mountPoint = @"archive:/"
 
+let toMicroOption<'a> (value : ValueOption<'a>) : MicroOption<'a> = value
+
 let toValueOption<'a> (microOption : MicroOption<'a>) : 'a voption =
     if microOption.IsSome then
         ValueSome microOption.Value
     else ValueNone
 
-let toMicroOption<'a> (valueOption : ValueOption<'a>) : MicroOption<'a> =
-    match valueOption with
-    | ValueSome some -> MicroOption.Some(some)
-    | ValueNone -> MicroOption<'a>.None
+//let toMicroOption<'a> (valueOption : ValueOption<'a>) : MicroOption<'a> =
+//    match valueOption with
+//    | ValueSome some -> MicroOption.Some(some)
+//    | ValueNone -> MicroOption<'a>.None
 
 let tryGetObject (tto : ITypeTreeValue) : ITypeTreeObject voption =
     tto.TryGetObject()
@@ -83,16 +89,90 @@ let formatAsFileSize (size : int64) : string =
     else
         size |> sprintf "%i B"
 
+let getDependencyFiles dependencylist =
+    if System.IO.File.Exists dependencylist then
+        let json =
+            File.ReadAllText(dependencylist)
+            |> JObject.Parse
+    
+        json.Property("BundleToDependencies")
+        |> Option.ofObj
+        |> Option.bind (fun p -> 
+            match p.Value with
+            | :? JObject as o -> Some o
+            | _ -> None)
+        |> function
+        | Some bundles ->
+            bundles.Properties()
+            |> Seq.map (fun p -> p.Name, p.Value)
+            |> Seq.choose (function
+            | _, :? JArray as (name, dependencies) ->
+                let deps = 
+                    dependencies
+                    |> Seq.map (fun d -> d.ToObject<string>())
+                    |> Seq.toArray
+                Some (name, deps)
+            | _ -> None)
+        | None -> Seq.empty
+        |> Map.ofSeq
+    else Map.empty
+
+let mountDependencies (bundlePath : string) =
+    let mutable mounted : string list = []
+
+    let rec mountDependenciesInner (bundlePath : string) =
+        let dir = Path.GetDirectoryName(bundlePath)
+        let name = Path.GetFileName(bundlePath)
+        
+        printfn "Mounting dependencies of %s" name
+
+        Path.Join(dir, "dependencylist.json")
+        |> getDependencyFiles
+        |> Map.tryFind name
+        |> Option.map (fun deps ->
+            deps
+            |> Seq.collect (fun d ->
+                seq {
+                    if mounted |> Seq.contains d |> not then
+                        let path = Path.Join(dir, d)
+
+                        printfn "Mounting %s" path
+                        yield UnityFileSystem.MountArchive(path, mountPoint)
+
+                        mounted <- d :: mounted
+
+                        yield! mountDependenciesInner path
+                })
+            |> Seq.toList)
+        |> function
+        | Some list -> list
+        | None -> List.empty
+
+    mountDependenciesInner bundlePath
+
 let printArchiveFiles bundlePath =
 
     UnityFileSystem.Init()
 
     use archive = UnityFileSystem.MountArchive(bundlePath, mountPoint)
 
+    let dependencies = mountDependencies bundlePath
+
+    let dependencyNodes =
+        dependencies
+        |> Seq.collect (fun archive -> archive.Nodes)
+        |> Seq.cache
+
     for n in archive.Nodes do
         printfn "%s" n.Path
         n.Size |> formatAsFileSize |> printfn "  Size: %s"
         printfn "  Flags %A" n.Flags
+
+    for n in dependencyNodes do
+        printfn "%s" n.Path
+        n.Size |> formatAsFileSize |> printfn "  Size: %s"
+        printfn "  Flags %A" n.Flags
+
 
     UnityFileSystem.Cleanup()
 
@@ -114,18 +194,18 @@ let dumpStreamData bundlePath dumpPath =
 
         let mutable fileReader : (string * UnityBinaryFileReader) voption = ValueNone
 
-        let getReader rPath =
-            match fileReader with
-            | ValueSome (readerPath, fileReader) when readerPath = rPath ->
-                ValueSome fileReader
-            | maybeReader ->
-                match maybeReader with
-                | ValueSome (_, reader) ->
-                    reader.Dispose()
-                | _ -> ()
-
-                fileReader <- ValueSome (rPath, new UnityBinaryFileReader(rPath))
-                sfReader |> ValueSome
+        //let getReader rPath (bufferSize : uint) =
+        //    match fileReader with
+        //    | ValueSome (readerPath, fileReader) when readerPath = rPath ->
+        //        ValueSome fileReader
+        //    | maybeReader ->
+        //        match maybeReader with
+        //        | ValueSome (_, reader) ->
+        //            reader.Dispose()
+        //        | _ -> ()
+                
+        //        fileReader <- ValueSome (rPath, new UnityBinaryFileReader(rPath, bufferSize |> int))
+        //        sfReader |> ValueSome
         try
             for objectInfo in sf.Objects do
                 let tto = TypeTreeValue.Get(sf, sfReader, objectInfo)
@@ -142,7 +222,7 @@ let dumpStreamData bundlePath dumpPath =
 
                 for (filePath, si) in sis do
                     let data =
-                        si.TryGetData(fun path -> getReader path |> toMicroOption)
+                        si.TryGetData()
                         |> toValueOption
 
                     match data with
@@ -158,7 +238,7 @@ let dumpStreamData bundlePath dumpPath =
                         File.WriteAllBytes(filePath, arr)
                         i <- i + 1
                     | _ -> ()
-                
+
         finally
             match fileReader with
             | ValueSome (path, reader) ->
@@ -177,15 +257,59 @@ let dump bundlePath outputDir =
 
     use archive = UnityFileSystem.MountArchive(bundlePath, mountPoint)
 
+    let dependencies = mountDependencies bundlePath
+
+    let dependencyNodes =
+        dependencies
+        |> Seq.collect (fun archive -> archive.Nodes)
+        |> Seq.cache
+
+    let mutable serializedFiles : SerializedFile list = []
+
+    let getSerializedFile path =
+        serializedFiles
+        |> Seq.tryFind (fun sf -> sf.Path = path)
+        |> function
+        | Some sf -> sf |> ValueSome
+        | None ->
+            if
+                dependencyNodes
+                |> Seq.exists (fun n ->
+                    n.Flags.HasFlag(ArchiveNodeFlags.SerializedFile)
+                    && $"{mountPoint}{n.Path}" = path)
+            then
+                let sf = UnityFileSystem.OpenSerializedFile(path)
+                serializedFiles <- sf :: serializedFiles
+                sf |> ValueSome
+            else ValueNone
+
+    let mutable readers : Map<string, UnityBinaryFileReader> = Map.empty
+
+    let getReader path =
+        readers |> Map.tryFind path
+        |> function
+        | Some reader -> reader
+        | _ ->
+            let reader = new UnityBinaryFileReader(path)
+            readers <- readers |> Map.add path reader
+            reader
+        |> ValueSome
+
     for node in archive.Nodes |> Seq.where (fun n -> n.Flags.HasFlag(ArchiveNodeFlags.SerializedFile)) do
         let path = $"{mountPoint}{node.Path}"
         printfn "open %s" path
 
         use sf = UnityFileSystem.OpenSerializedFile(path)
 
+        serializedFiles <- sf :: serializedFiles
+
         let newReader() = new UnityBinaryFileReader(path)
 
         let reader = newReader()
+
+        //let getReader readerPath =
+        //    if readerPath = path then reader |> ValueSome
+        //    else getReader path
         
         let sw = Stopwatch.StartNew()
 
@@ -218,43 +342,63 @@ let dump bundlePath outputDir =
 
         sw.Restart()
 
-        let mutable i = 0
+        //let mutable i = 0
 
         let ttObjects =
             sf.Objects
             |> Seq.map (fun o -> o.Id, TypeTreeValue.Get(sf, reader, o))
-            |> Seq.cache
+            |> Seq.toArray
+
+        sw.Stop()
+
+        printfn "Got %i objects in %ims" (ttObjects.Length) sw.ElapsedMilliseconds
+
+        printfn "Dump start"
+
+        sw.Restart()
 
         let dir =  Path.Join(outputDir, node.Path)
 
         if Directory.Exists(dir) |> not then
             Directory.CreateDirectory(dir) |> ignore
 
-        for oid, tto in ttObjects do
-            match tto with
-            | :? ITypeTreeObject as tto ->
-                let name =
-                    match tto.ToDictionary().TryGetValue("m_Name") with
-                    | true, (:? TypeTreeValue<string> as name) -> name.Value
-                    | _ -> ""
+        ttObjects
+        |> Seq.map (fun (oid, tto) ->
 
-                let name =
-                    name
-                    |> Seq.map (fun c -> if invalidFileChars |> Array.contains c then '_' else c)
-                    |> Seq.toArray
-                    |> System.String
+        //for oid, tto in ttObjects do
+            async {
+                match tto with
+                | :? ITypeTreeObject as tto ->
+                    let name =
+                        match tto.ToDictionary().TryGetValue("m_Name") with
+                        | true, (:? TypeTreeValue<string> as name) -> name.Value
+                        | _ -> ""
 
-                let filename = Path.Join(dir, $"{name}.{oid}.{tto.Node.Type}.txt")
+                    let name =
+                        name
+                        |> Seq.map (fun c -> if invalidFileChars |> Array.contains c then '_' else c)
+                        |> Seq.toArray
+                        |> System.String
 
-                File.WriteAllText(filename, tto.ToString())
+                    let filename = Path.Join(dir, $"{name}.{oid}.{tto.Node.Type}.txt")
+                    
+                    return!
+                        File.WriteAllTextAsync(filename, tto.ToString())
+                        |> Async.AwaitTask
+                    //File.WriteAllText(filename, tto.ToString())
 
-            | _ -> ()
+                | _ -> ()
 
-            i <- i + 1
+                //i <- i + 1
+            }
+        )
+        |> Async.Parallel
+        |> Async.RunSynchronously
+        |> ignore
 
         sw.Stop()
 
-        printfn "Dumped %i objects in %ims" i sw.ElapsedMilliseconds
+        printfn "Dump completed in %ims" sw.ElapsedMilliseconds
 
         reader.Dispose()
         let reader = newReader()
@@ -280,8 +424,10 @@ let dump bundlePath outputDir =
             |> Seq.map (fun pptr ->
                 let tto =
                     pptr.TryDereference(
-                        (fun sfp -> (if sfp = path then ValueSome sf else ValueNone) |> toMicroOption),
-                        (fun readerPath -> (if readerPath = path then MicroOption.Some(reader) else MicroOption<UnityBinaryFileReader>.None)))
+                        getSerializedFile >> toMicroOption,
+                        //(fun readerPath -> (if readerPath = path then MicroOption.Some(reader) else MicroOption<UnityBinaryFileReader>.None))
+                        getReader >> toMicroOption
+                    )
                     |> toValueOption
                     |> ValueOption.bind (fun tto -> tto.TryGetObject() |> toValueOption)
 
@@ -312,6 +458,15 @@ let dump bundlePath outputDir =
         ||> printfn "Dumped %i PPtrs in %ims" 
 
     printfn "Done"
+
+    for r in readers.Values do
+        r.Dispose()
+
+    for sf in serializedFiles do
+        sf.Dispose()
+
+    for archive in dependencies do
+        archive.Dispose()
 
     UnityFileSystem.Cleanup()
 
@@ -377,7 +532,7 @@ let decodeTextures bundlePath outputDir =
             if File.Exists(fileName) |> not then
                 let buf = Array.zeroCreate (t.Width * t.Height * 4)
 
-                let success = Texture2DConverter.DecodeTexture2D(t, System.Span(buf), fun path -> (getReader path |> toMicroOption))
+                let success = Texture2DConverter.DecodeTexture2D(t, System.Span(buf), fun path -> (getReader path))
 
                 if success then
                     let format = System.Drawing.Imaging.PixelFormat.Format32bppArgb
@@ -415,9 +570,9 @@ let main args =
             if args.Length > 1 && args[1] <> "" then args[1] else $"{Path.GetFileName(bundlePath)}_dump"
 
         dump bundlePath outputDir
-        Debugger.Break()
+        //Debugger.Break()
         dumpStreamData bundlePath outputDir
-        Debugger.Break()
+        //Debugger.Break()
         decodeTextures bundlePath outputDir
-        Debugger.Break()
+        //Debugger.Break()
     0

@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using MicroUtils.Functional;
+using MicroUtils.Types;
 
 using UnityDataTools.FileSystem;
 
@@ -27,9 +28,9 @@ namespace MicroUtils.UnityFilesystem.Parsers
             _ => throw new NotSupportedException()
         };
 
-        public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile _)
+        public Optional<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile _)
         {
-            static Option<float> tryGetFloat(ITypeTreeObject obj, string name)
+            static Optional<float> tryGetFloat(ITypeTreeObject obj, string name)
             {
                 return obj.TryGetField<float>(name).Map(get => get());
             }
@@ -43,27 +44,27 @@ namespace MicroUtils.UnityFilesystem.Parsers
                 .Bind(o => o.Node.Type switch
                 {
                     nameof(Vector2f) =>
-                        Option<Func<float, Func<float, ITypeTreeValue>>>
-                            .Some(x => y => obj.WithValue(new Vector2f(x, y)))
+                        Optional.Some<Func<float, Func<float, ITypeTreeValue>>>(
+                            x => y => obj.WithValue(new Vector2f(x, y)))
                             .Apply(x)
                             .Apply(y),
 
                     nameof(Vector3f) =>
-                        Option<Func<float, Func<float, Func<float, ITypeTreeValue>>>>
-                            .Some(x => y => z => obj.WithValue(new Vector3f(x, y, z)))
+                        Optional.Some<Func<float, Func<float, Func<float, ITypeTreeValue>>>>(
+                            x => y => z => obj.WithValue(new Vector3f(x, y, z)))
                             .Apply(x)
                             .Apply(y)
                             .Apply(z),
 
                     nameof(Vector4f) =>
-                        Option<Func<float, Func<float, Func<float, Func<float, ITypeTreeValue>>>>>
-                            .Some(x => y => z => w => obj.WithValue(new Vector4f(x, y, z, w)))
+                        Optional.Some<Func<float, Func<float, Func<float, Func<float, ITypeTreeValue>>>>>(
+                            x => y => z => w => obj.WithValue(new Vector4f(x, y, z, w)))
                             .Apply(x)
                             .Apply(y)
                             .Apply(z)
                             .Apply(w),
 
-                    _ => Option<ITypeTreeValue>.None
+                    _ => default
                 });
         }
     }

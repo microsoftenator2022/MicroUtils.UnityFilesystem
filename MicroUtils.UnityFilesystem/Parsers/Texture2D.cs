@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using MicroUtils.Functional;
+using MicroUtils.Types;
 
 using UnityDataTools.FileSystem;
 
@@ -19,7 +20,7 @@ public readonly record struct Texture2D(int Width, int Height, TextureFormat For
     public long EndOffset => TypeTreeObject.EndOffset;
     public IDictionary<string, ITypeTreeValue> ToDictionary() => TypeTreeObject.ToDictionary();
 
-    public byte[] GetRawData(Func<string, Option<UnityBinaryFileReader>> getReader)
+    public byte[] GetRawData(Func<string, Optional<UnityBinaryFileReader>> getReader)
     {
         var imageData = this["image data"].TryGetArray<byte>().DefaultValue([]);
 
@@ -35,13 +36,13 @@ partial class Texture2DParser : IObjectParser
     public bool CanParse(TypeTreeNode node) => node.Type == "Texture2D";
     public Type ObjectType(TypeTreeNode _) => typeof(Texture2D);
 
-    Option<Texture2D> TryCreate(TypeTreeObject tto)
+    Optional<Texture2D> TryCreate(TypeTreeObject tto)
     {
         var width = tto.TryGetField<int>("m_Width").Map(get => get());
         var height = tto.TryGetField<int>("m_Height").Map(get => get());
         var format = tto.TryGetField<int>("m_TextureFormat").Map(get => (TextureFormat)get());
 
-        var create = Option<Func<int, int, Func<TextureFormat, Texture2D>>>.Some(
+        var create = Optional.Some<Func<int, int, Func<TextureFormat, Texture2D>>>(
             (width, height) =>
             format => new Texture2D(width, height, format, tto));
 
@@ -50,10 +51,10 @@ partial class Texture2DParser : IObjectParser
             .Apply(format);
     }
 
-    public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
+    public Optional<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         return obj.TryGetObject()
-            .Bind(o => (o as TypeTreeObject).ToOption())
+            .Bind(o => (o as TypeTreeObject).OfNullable())
             .Bind(TryCreate)
             .Map<Texture2D, ITypeTreeValue>(t2d => t2d);
     }

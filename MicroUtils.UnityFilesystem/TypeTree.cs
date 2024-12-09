@@ -1,15 +1,16 @@
 ﻿namespace MicroUtils.UnityFilesystem;
 
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 
 using MicroUtils;
-using MicroUtils.Linq;
-using MicroUtils.Functional;
+//using MicroUtils.Functional;
+//using MicroUtils.Linq;
+using MicroUtils.Types;
 using MicroUtils.UnityFilesystem.Parsers;
 
 using UnityDataTools.FileSystem;
-using System.Reflection;
 
 public interface ITypeTreeValue
 {
@@ -33,7 +34,7 @@ public record class TypeTreeValue<T>(
     long EndOffset,
     T Value) : ITypeTreeValue
 {
-    public ITypeTreeValue? this[string key] => this.TryGetObject().Map(o => o[key]).MaybeValue;
+    public ITypeTreeValue? this[string key] => this.TryGetObject().Map(o => o[key]).DefaultValue(default!);
     
     static IEnumerable<(int, string)> GetToStringLines(ITypeTreeValue obj, int indentLevel = 0)
     {
@@ -173,7 +174,7 @@ public static class TypeTreeUtil
         return offset;
     }
 
-    public static Option<ITypeTreeValue> TryIntegralValue(
+    public static Optional<ITypeTreeValue> TryIntegralValue(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long offset,
@@ -183,26 +184,26 @@ public static class TypeTreeUtil
             new TypeTreeValue<T>(node, ancestors, offset, offset + node.SizeSafe(), value);
 
         if (!node.IsBasicType)
-            return Option<ITypeTreeValue>.None;
+            return default;
 
         return node.CSharpType switch
         {
-            var t when t == typeof(int) => Option.Some(value(reader.ReadInt32(offset))),
-            var t when t == typeof(uint) => Option.Some(value(reader.ReadUInt32(offset))),
-            var t when t == typeof(float) => Option.Some(value(reader.ReadFloat(offset))),
-            var t when t == typeof(double) => Option.Some(value(reader.ReadDouble(offset))),
-            var t when t == typeof(short) => Option.Some(value(reader.ReadInt16(offset))),
-            var t when t == typeof(ushort) => Option.Some(value(reader.ReadUInt16(offset))),
-            var t when t == typeof(long) => Option.Some(value(reader.ReadInt64(offset))),
-            var t when t == typeof(ulong) => Option.Some(value(reader.ReadUInt64(offset))),
-            var t when t == typeof(sbyte) => Option.Some(value(reader.ReadInt8(offset))),
-            var t when t == typeof(byte) => Option.Some(value(reader.ReadUInt8(offset))),
-            var t when t == typeof(bool) => Option.Some(value(reader.ReadUInt8(offset) != 0)),
-            _ => Option<ITypeTreeValue>.None
+            var t when t == typeof(int) => Optional.Some(value(reader.ReadInt32(offset))),
+            var t when t == typeof(uint) => Optional.Some(value(reader.ReadUInt32(offset))),
+            var t when t == typeof(float) => Optional.Some(value(reader.ReadFloat(offset))),
+            var t when t == typeof(double) => Optional.Some(value(reader.ReadDouble(offset))),
+            var t when t == typeof(short) => Optional.Some(value(reader.ReadInt16(offset))),
+            var t when t == typeof(ushort) => Optional.Some(value(reader.ReadUInt16(offset))),
+            var t when t == typeof(long) => Optional.Some(value(reader.ReadInt64(offset))),
+            var t when t == typeof(ulong) => Optional.Some(value(reader.ReadUInt64(offset))),
+            var t when t == typeof(sbyte) => Optional.Some(value(reader.ReadInt8(offset))),
+            var t when t == typeof(byte) => Optional.Some(value(reader.ReadUInt8(offset))),
+            var t when t == typeof(bool) => Optional.Some(value(reader.ReadUInt8(offset) != 0)),
+            _ => default
         };
     }
 
-    public static Option<ITypeTreeValue> TryString(
+    public static Optional<ITypeTreeValue> TryString(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
@@ -212,7 +213,7 @@ public static class TypeTreeUtil
             new TypeTreeValue<string>(node, ancestors, startOffset, endOffset, value);
 
         if (node.Type != "string")
-            return Option<ITypeTreeValue>.None;
+            return default;
 
         var length = reader.ReadInt32(startOffset);
         var offset = startOffset + 4L;
@@ -222,10 +223,10 @@ public static class TypeTreeUtil
             (length, reader.ReadString(offset, length)) :
             (0, "");
 
-        return Option.Some(value(offset + length, s));
+        return Optional.Some(value(offset + length, s));
     }
 
-    public static Option<ITypeTreeValue> TryArray(
+    public static Optional<ITypeTreeValue> TryArray(
         UnityBinaryFileReader reader,
         MicroStack<TypeTreeNode> ancestors,
         long startOffset,
@@ -236,7 +237,7 @@ public static class TypeTreeUtil
             new TypeTreeValue<System.Array>(node, ancestors, startOffset, endOffset, value);
 
         if (!node.IsArray)
-            return Option<ITypeTreeValue>.None;
+            return default;
 
         var sizeNode = node.Children[0];
         if (!sizeNode.IsLeaf || sizeNode.Size != 4)
@@ -258,7 +259,7 @@ public static class TypeTreeUtil
 
             offset += (dataNode.SizeSafe() * (long)length);
 
-            return Option.Some(value(offset, array));
+            return Optional.Some(value(offset, array));
         }
 
         var elements = new ITypeTreeValue[length];
@@ -273,7 +274,7 @@ public static class TypeTreeUtil
             }
         }
 
-        return Option.Some(value(offset, elements));
+        return Optional.Some(value(offset, elements));
     }
 
     public static ITypeTreeObject GetObject(
@@ -333,13 +334,13 @@ public static class TypeTreeValue
                     {
                         if (!node.IsLeaf && !ancestors.IsEmpty)
                         {
-                            return Option.Some(new TypeTreeIgnored(node, ancestors, offset, node.SizeSafe()) as ITypeTreeValue);
+                            return Optional.Some(new TypeTreeIgnored(node, ancestors, offset, node.SizeSafe()) as ITypeTreeValue);
                         }
 
                         throw new Exception($"{node.Type} not implemented");
                     }
 
-                    return Option<ITypeTreeValue>.None;
+                    return default;
                 })
                 .DefaultWith(() => TypeTreeUtil.GetObject(reader, ancestors, offset, node, sf));
 
@@ -382,10 +383,10 @@ public static class TypeTreeValue
         }
     }
 
-    public static Option<Func<T>> TryGetValue<T>(this ITypeTreeValue tto)
+    public static Optional<Func<T>> TryGetValue<T>(this ITypeTreeValue tto)
     {
         if (tto is TypeTreeValue<T> obj)
-            return Option.Some(() => obj.Value);
+            return Optional.Some(() => obj.Value);
 
         var type = tto.GetType();
 
@@ -393,29 +394,29 @@ public static class TypeTreeValue
 
         if (p is not null && typeof(T).IsAssignableFrom(p.PropertyType))
         {
-            return Option.Some(() => (T)p.GetValue(tto)!);
+            return Optional.Some(() => (T)p.GetValue(tto)!);
         }
 
-        return Option<Func<T>>.None;
+        return default;
     }
 
-    public static Option<T[]> TryGetArray<T>(this ITypeTreeValue tto) =>
+    public static Optional<T[]> TryGetArray<T>(this ITypeTreeValue tto) =>
         TryGetValue<System.Array?>(tto).Bind(get =>
         {
             var value = get();
 
             if (value is null)
-                return Option<T[]>.None;
+                return default;
 
             if (value is T[] arr)
-                return Option.Some(arr);
+                return Optional.Some(arr);
 
             if (value.Length == 0)
-                return Option<T[]>.Some([]);
+                return Optional.Some<T[]>([]);
 
             if (value is ITypeTreeValue[] ttArray)
             {
-                return Option.Some(
+                return Optional.Some(
                     ttArray.Select(x =>
                     {
                         if (x is T t)
@@ -432,30 +433,30 @@ public static class TypeTreeValue
             }
 
             if (value.OfType<T>().Count() != value.Length)
-                return Option<T[]>.None;
+                return default;
 
-            return value.ToOption().Map(arr => arr.Cast<T>().ToArray());
+            return value.OfNullable().Map(arr => arr.Cast<T>().ToArray());
         });
 
-    public static Option<ITypeTreeValue[]> TryGetArray(this ITypeTreeValue tto) => TryGetArray<ITypeTreeValue>(tto);
+    public static Optional<ITypeTreeValue[]> TryGetArray(this ITypeTreeValue tto) => TryGetArray<ITypeTreeValue>(tto);
 
-    public static Option<ITypeTreeObject> TryGetObject(this ITypeTreeValue tto)
+    public static Optional<ITypeTreeObject> TryGetObject(this ITypeTreeValue tto)
     {
         if (tto is ITypeTreeObject obj)
-            return Option.Some(obj);
+            return Optional.Some(obj);
         
         if (tto is TypeTreeValue<Dictionary<string, ITypeTreeValue>> objectValue)
-            return Option<ITypeTreeObject>.Some(TypeTreeObject.FromValue(objectValue));
+            return Optional.Some<ITypeTreeObject>(TypeTreeObject.FromValue(objectValue));
         
-        return Option<ITypeTreeObject>.None;
+        return default;
     }
 
-    public static Option<Func<T>> TryGetField<T>(this ITypeTreeObject tto, string fieldName)
+    public static Optional<Func<T>> TryGetField<T>(this ITypeTreeObject tto, string fieldName)
     {
         if (tto.ToDictionary().TryGetValue(fieldName, out var value))
             return value.TryGetValue<T>();
 
-        return Option<Func<T>>.None;
+        return default;
     }
 
     public static T GetValue<T>(this ITypeTreeValue tto) => tto.TryGetValue<T>().Value();

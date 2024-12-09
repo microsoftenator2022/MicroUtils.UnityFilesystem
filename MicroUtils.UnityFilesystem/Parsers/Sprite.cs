@@ -7,15 +7,17 @@ using System.Text;
 using System.Threading.Tasks;
 
 using MicroUtils.Functional;
+using MicroUtils.Types;
 
 using UnityDataTools.FileSystem;
 
 public readonly record struct Sprite(
     SpriteSettings SpriteSettings,
-    Option<PPtr> TexturePtr,
-    Option<PPtr> AtlasPtr,
-    Option<(Guid, long)> RenderDataKey,
-    Option<Rectf> Rect,
+    Optional<PPtr> TexturePtr,
+    Optional<PPtr> AtlasPtr,
+    Optional<(Guid, long)> RenderDataKey,
+    Optional<Rectf> Rect,
+    Optional<Rectf> TextureRect,
     TypeTreeObject TypeTreeObject) : ITypeTreeObject
 {
     public ITypeTreeValue this[string key] => ((ITypeTreeObject)TypeTreeObject)[key];
@@ -30,7 +32,7 @@ class SpriteParser : IObjectParser
 {
     public bool CanParse(TypeTreeNode node) => node.Type == "Sprite";
     public Type ObjectType(TypeTreeNode node) => typeof(Sprite);
-    public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
+    public Optional<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         if (obj is TypeTreeObject tto)
         { 
@@ -38,16 +40,18 @@ class SpriteParser : IObjectParser
 
             if (!dict.TryGetValue("m_RD", out var rd) || rd is not ITypeTreeObject renderData)
             {
-                return Option<ITypeTreeValue>.None;
+                return default;
             }
 
             var settingsRaw = renderData.TryGetField<uint>("settingsRaw").Map(get => get());
 
             var texturePtr = renderData.TryGetField<PPtr>("texture").Map(get => get());
 
+            var textureRect = renderData.TryGetField<Rectf>("textureRect").Map(get => get());
+
             var atlas = tto.TryGetField<PPtr>("m_SpriteAtlas").Map(get => get());
 
-            Option<(Guid, long)> rdKey = Option<(Guid, long)>.None;
+            Optional<(Guid, long)> rdKey = default;
 
             if (dict.TryGetValue("m_RenderDataKey", out var k))
             {
@@ -56,21 +60,21 @@ class SpriteParser : IObjectParser
                     {
                         var (guid, fileid) = get();
 
-                        return Option.Some((Func<Guid> g, Func<long> fid) => (g(), fid()))
-                            .Apply2(guid.TryGetValue<Guid>(), fileid.TryGetValue<long>());
+                        return Optional.Some((Func<Guid> g, Func<long> fid) => (g(), fid()))
+                            .Apply(guid.TryGetValue<Guid>(), fileid.TryGetValue<long>());
                     });
             }
 
-            var rect = Option<Rectf>.None;
+            var rect = Optional<Rectf>.None;
 
             if (dict.TryGetValue("m_Rect", out var r))
             {
                 rect = r.TryGetValue<Rectf>().Map(get => get());
             }
 
-            return settingsRaw.Map(sr => new Sprite(new(sr), texturePtr, atlas, rdKey, rect, tto) as ITypeTreeValue);
+            return settingsRaw.Map(sr => new Sprite(new(sr), texturePtr, atlas, rdKey, rect, textureRect, tto) as ITypeTreeValue);
         }
-        return Option<ITypeTreeValue>.None;
+        return default;
     }
 }
 

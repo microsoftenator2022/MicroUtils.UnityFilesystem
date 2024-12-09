@@ -4,6 +4,7 @@ using System;
 using System.Runtime.CompilerServices;
 
 using MicroUtils.Functional;
+using MicroUtils.Types;
 using MicroUtils.UnityFilesystem.Parsers;
 
 using Texture2DDecoder;
@@ -20,7 +21,7 @@ public static class Texture2DConverter
         public int Height => this.Texture.Height;
     }
 
-    public static bool DecodeTexture2D(this Texture2D texture, Span<byte> buffer, Func<string, Option<UnityBinaryFileReader>> getReader)
+    public static bool DecodeTexture2D(this Texture2D texture, Span<byte> buffer, Func<string, Optional<UnityBinaryFileReader>> getReader)
     {
         if (texture.Width < 1 || texture.Height < 1)
             return false;

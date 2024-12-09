@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using MicroUtils.Functional;
+using MicroUtils.Types;
 using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
@@ -17,7 +18,7 @@ public interface IObjectParser
 {
     bool CanParse(TypeTreeNode node);
     Type ObjectType(TypeTreeNode node);
-    Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf);
+    Optional<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf);
 }
 
 public static class ObjectParsers

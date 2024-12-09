@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 using MicroUtils;
 using MicroUtils.Functional;
+using MicroUtils.Types;
 using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
@@ -13,7 +14,7 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
 {
     public static readonly PPtr NullPtr = new();
 
-    public string GetReferencePath(Func<string, Option<SerializedFile>> getSerializedFile)
+    public string GetReferencePath(Func<string, Optional<SerializedFile>> getSerializedFile)
     {
         if (this == NullPtr)
         {
@@ -50,12 +51,12 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
         return path;
     }
 
-    public Option<ITypeTreeValue> TryDereference(Func<string, Option<SerializedFile>> getSerializedFile, Func<string, Option<UnityBinaryFileReader>> getReader)
+    public Optional<ITypeTreeValue> TryDereference(Func<string, Optional<SerializedFile>> getSerializedFile, Func<string, Optional<UnityBinaryFileReader>> getReader)
     {
         if (this == NullPtr)
         {
             Console.Error.WriteLine("Tried to dereference nullptr");
-            return Option<ITypeTreeValue>.None;
+            return default;
         }
 
         string path = "Unknown";
@@ -97,7 +98,7 @@ public readonly record struct PPtr(string TypeName, int FileID, long PathID, str
         catch (Exception e) when (e is KeyNotFoundException or IndexOutOfRangeException)
         {
             Console.Error.WriteLine($"{this} Could not get reader for FileID {FileID} = {path}");
-            return Option<ITypeTreeValue>.None;
+            return default;
         }
     }
 
@@ -115,12 +116,12 @@ partial class PPtrParser : IObjectParser
 
     public bool CanParse(TypeTreeNode node) => node.Type.StartsWith("PPtr") && PPtrPattern().IsMatch(node.Type);
     public Type ObjectType(TypeTreeNode _) => typeof(PPtr);
-    public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
+    public Optional<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         var match = PPtrPattern().Match(obj.NodeType());
 
         if (!match.Success)
-            return Option<ITypeTreeValue>.None;
+            return default;
 
         var typeName = match.Groups[1].Value;
 
@@ -128,15 +129,15 @@ partial class PPtrParser : IObjectParser
         var fid = p.Bind(p => p.TryGetField<int>("m_FileID")).Map(f => f());
         var pid = p.Bind(p => p.TryGetField<long>("m_PathID")).Map(f => f());
 
-        if (!fid.IsSome || !pid.IsSome)
-            return Option<ITypeTreeValue>.None;
+        if (!fid.HasValue || !pid.HasValue)
+            return default;
 
         var ptr = PPtr.NullPtr;
 
         if (pid.Value != 0)
             ptr = new PPtr(typeName, fid.Value, pid.Value, sf.Path);
 
-        return Option.Some<ITypeTreeValue>(new TypeTreeValue<PPtr>(
+        return Optional.Some<ITypeTreeValue>(new TypeTreeValue<PPtr>(
             obj.Node,
             obj.Ancestors,
             obj.StartOffset,

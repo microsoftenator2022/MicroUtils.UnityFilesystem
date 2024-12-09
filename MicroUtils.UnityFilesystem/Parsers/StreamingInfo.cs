@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using MicroUtils.Functional;
+using MicroUtils.Types;
 using MicroUtils.UnityFilesystem;
 
 using UnityDataTools.FileSystem;
@@ -17,11 +18,11 @@ public readonly record struct StreamingInfo(ulong Offset, ulong Size, string Raw
 {
     public string GetReferencePath() => new UnityReferencePath(RawPath).ToFilePath();
 
-    public Option<byte[]> TryGetData()
+    public Optional<byte[]> TryGetData()
     {
         var size = this.Size;
         UnityBinaryFileReader? reader = null;
-        Option<UnityBinaryFileReader> getReader(string path) => Option.Some(new UnityBinaryFileReader(path, (int)size));
+        Optional<UnityBinaryFileReader> getReader(string path) => Optional.Some(new UnityBinaryFileReader(path, (int)size));
         
         var result = TryGetData(getReader);
 
@@ -30,7 +31,7 @@ public readonly record struct StreamingInfo(ulong Offset, ulong Size, string Raw
         return result;
     }
 
-    public Option<byte[]> TryGetData(Func<string, Option<UnityBinaryFileReader>> getReader)
+    public Optional<byte[]> TryGetData(Func<string, Optional<UnityBinaryFileReader>> getReader)
     {
 
         var path = this.GetReferencePath();
@@ -46,7 +47,7 @@ public readonly record struct StreamingInfo(ulong Offset, ulong Size, string Raw
 
             reader.ReadArray((long)this.Offset, (int)this.Size, data);
 
-            return Option.Some(data);
+            return Optional.Some(data);
         }
         catch (Exception e)
         {
@@ -63,7 +64,7 @@ public readonly record struct StreamingInfo(ulong Offset, ulong Size, string Raw
 
             reader.ReadArray((long)this.Offset, (int)this.Size, data);
 
-            return Option.Some(data);
+            return Optional.Some(data);
         }
     }
 }
@@ -72,10 +73,10 @@ partial class StreamingInfoParser : IObjectParser
 {
     public bool CanParse(TypeTreeNode node) => node.Type == "StreamingInfo" || node.Type == "StreamedResource";
     public Type ObjectType(TypeTreeNode _) => typeof(TypeTreeValue<StreamingInfo>);
-    public Option<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
+    public Optional<ITypeTreeValue> TryParse(ITypeTreeValue obj, SerializedFile sf)
     {
         if (!CanParse(obj.Node))
-            return Option<ITypeTreeValue>.None;
+            return default;
 
         var si = obj.TryGetObject();
 
@@ -88,9 +89,9 @@ partial class StreamingInfoParser : IObjectParser
                     {
                         var s = path();
                         if (string.IsNullOrEmpty(s))
-                            return Option<string>.None;
+                            return default;
 
-                        return Option.Some(s);
+                        return Optional.Some(s);
                     }),
                     si.Bind(si => si.TryGetField<ulong>("offset")).Map(offset => offset()),
                     si.Bind(si => si.TryGetField<uint>("size")).Map(size => (ulong)(size()))),
@@ -101,21 +102,21 @@ partial class StreamingInfoParser : IObjectParser
                     {
                         var s = path();
                         if (string.IsNullOrEmpty(s))
-                            return Option<string>.None;
+                            return default;
 
-                        return Option.Some(s);
+                        return Optional.Some(s);
                     }),
                     si.Bind(si => si.TryGetField<ulong>("m_Offset")).Map(offset => offset()),
                     si.Bind(si => si.TryGetField<ulong>("m_Size")).Map(size => size())),
-            _ => (Option<string>.None, Option<ulong>.None, Option<ulong>.None)
+            _ => (Optional<string>.None, Optional<ulong>.None, Optional<ulong>.None)
         };
 
-        if (path.IsNone || offset.IsNone || size.IsNone)
-            return Option<ITypeTreeValue>.None;
+        if (!path.HasValue || !offset.HasValue || !size.HasValue)
+            return default;
 
         var node = obj.Node;
 
-        return Option.Some<ITypeTreeValue>(new TypeTreeValue<StreamingInfo>(
+        return Optional.Some<ITypeTreeValue>(new TypeTreeValue<StreamingInfo>(
             node,
             obj.Ancestors,
             obj.StartOffset,
